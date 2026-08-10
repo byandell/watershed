@@ -1,0 +1,22 @@
+Package: hexmap
+Type: Package
+Title: Interactive Hexagonal Watershed Mapping and Spatial Projection
+Version: 0.1.0
+Authors@R: person("Brian S.", "Yandell", email = "yandell@stat.wisc.edu", role = c("aut", "cre"))
+Description: Interactive discovery of USGS HUC subwatershed boundaries using Leaflet, dynamic feature isolation (such as island landmasses via OpenStreetMap), and mathematical projection of hexagonal substrate grid networks.
+License: GPL-3
+Encoding: UTF-8
+Imports: 
+    shiny,
+    leaflet,
+    leaflet.extras,
+    sf,
+    nhdplusTools,
+    osmdata,
+    ggplot2,
+    utils,
+    stats
+Suggests: 
+    knitr,
+    rmarkdown
+Config/roxygen2/version: 8.0.0

@@ -1,0 +1,55 @@
+url: https://byandell.github.io/hexmap/
+template:
+  bootstrap: 5
+  includes:
+    in_header: |
+      <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+      <style>
+        pre.mermaid {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          text-align: center;
+        }
+      </style>
+      <script>
+        document.addEventListener("DOMContentLoaded", function() {
+          mermaid.initialize({ startOnLoad: true });
+        });
+      </script>
+
+navbar:
+  structure:
+    left:  [intro, reference, demos, news]
+    right: [search, github]
+  components:
+    demos:
+      text: Demos
+      href: demos/index.html
+    github:
+      icon: fab fa-github fa-lg
+      href: https://github.com/byandell/hexmap
+
+reference:
+  - title: "Interactive Shiny Applications"
+    contents:
+      - hexmapApp
+      - leafletApp
+  - title: "GIS Watershed & Spatial Mesh Utilities"
+    contents:
+      - get_watershed
+      - add_watershed_hex_overlay
+      - discover_watershed_features
+  - title: "Leaflet Interactive Mapping Utilities"
+    contents:
+      - build_base_map
+      - get_huc_from_point
+      - get_hucs_from_polygon
+      - add_leaflet_hex_overlay
+  - title: "Moose Habitat Features & Overlays"
+    contents:
+      - get_habitat_features
+      - get_moose_landmarks
+      - add_habitat_hex_overlay
+      - add_leaflet_habitat_overlay
+      - get_site_cache_file

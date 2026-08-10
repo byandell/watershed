@@ -1,0 +1,9 @@
+^demos$
+^docs$
+^\.github$
+^app\.R$
+^_pkgdown\.yml$
+^.*\.Rproj$
+^\.Rproj\.user$
+^Rplots\.pdf$
+

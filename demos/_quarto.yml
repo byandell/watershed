@@ -1,0 +1,27 @@
+project:
+  type: website
+  output-dir: ../docs/demos
+
+engine: knitr
+
+website:
+  title: "hexmap Demos"
+  navbar:
+    left:
+      - href: ../index.html
+        text: Home
+      - href: index.qmd
+        text: Gallery
+      - href: hexmapApp.qmd
+        text: hexmapApp
+    right:
+      - icon: github
+        href: https://github.com/byandell/hexmap
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    embed-resources: false
+    self-contained: false
