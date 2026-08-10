@@ -22,7 +22,7 @@ hexagonal grid overlays."><script src="https://cdn.jsdelivr.net/npm/mermaid@10/d
 
     <a class="navbar-brand me-2" href="../index.html">hexmap</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -30,7 +30,8 @@ hexagonal grid overlays."><script src="https://cdn.jsdelivr.net/npm/mermaid@10/d
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/hexmap.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item"><a class="nav-link" href="../demos/index.html">Demos</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
@@ -60,7 +61,7 @@ hexagonal grid overlays.</p>
 <span></span>
 <span><span class="fu">get_huc_from_point</span><span class="op">(</span><span class="va">lng</span>, <span class="va">lat</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">get_hucs_from_polygon</span><span class="op">(</span><span class="va">polygon_sf</span>, max_hucs <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
+<span><span class="fu">get_hucs_from_polygon</span><span class="op">(</span><span class="va">polygon_sf</span>, max_hucs <span class="op">=</span> <span class="fl">6</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">add_leaflet_hex_overlay</span><span class="op">(</span></span>
 <span>  <span class="va">map</span>,</span>
@@ -87,7 +88,7 @@ hexagonal grid overlays.</p>
 
 
 <dt id="arg-max-hucs">max_hucs<a class="anchor" aria-label="anchor" href="#arg-max-hucs"></a></dt>
-<dd><p>Maximum number of subwatersheds before scaling up to broader HUC levels (default: 10).</p></dd>
+<dd><p>Maximum number of subwatersheds before scaling up to broader HUC levels (default: 6, targeting 5-7 regions).</p></dd>
 
 
 <dt id="arg-map">map<a class="anchor" aria-label="anchor" href="#arg-map"></a></dt>
@@ -110,7 +111,7 @@ hexagonal grid overlays.</p>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>`build_base_map`: A `leaflet` HTML widget object.</p>
 <p>`get_huc_from_point`: An `sf` polygon representation of the covering HUC12.</p>
-<p>`get_hucs_from_polygon`: An `sf` data frame of overlapping HUC subwatersheds (auto-scaled to HUC12, HUC10, or HUC8).</p>
+<p>`get_hucs_from_polygon`: An `sf` data frame of overlapping HUC subwatersheds (auto-scaled via code-annealed prefix matching).</p>
 <p>`add_leaflet_hex_overlay`: Updated `leaflet` map object.</p>
     </div>
 

@@ -11,7 +11,7 @@ build_base_map()
 
 get_huc_from_point(lng, lat)
 
-get_hucs_from_polygon(polygon_sf, max_hucs = 10)
+get_hucs_from_polygon(polygon_sf, max_hucs = 6)
 
 add_leaflet_hex_overlay(
   map,
@@ -39,7 +39,7 @@ add_leaflet_hex_overlay(
 - max_hucs:
 
   Maximum number of subwatersheds before scaling up to broader HUC
-  levels (default: 10).
+  levels (default: 6, targeting 5-7 regions).
 
 - map:
 
@@ -66,6 +66,6 @@ add_leaflet_hex_overlay(
 HUC12.
 
 \`get_hucs_from_polygon\`: An \`sf\` data frame of overlapping HUC
-subwatersheds (auto-scaled to HUC12, HUC10, or HUC8).
+subwatersheds (auto-scaled via code-annealed prefix matching).
 
 \`add_leaflet_hex_overlay\`: Updated \`leaflet\` map object.

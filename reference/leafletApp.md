@@ -1,15 +1,19 @@
 # Interactive Leaflet Mapping UI (Output)
 
-Server logic for interactive Leaflet discovery. Returns a list of
-reactives (\`huc\`, \`status\`, \`click\`, \`drawn_polygon\`) enabling
-Shiny module composition.
+Interactive Leaflet Mapping UI (Output)
+
+Interactive Leaflet Mapping Server Logic Server logic for interactive
+Leaflet discovery. Returns a list of reactives (\`huc\`, \`status\`,
+\`click\`, \`drawn_polygon\`) enabling Shiny module composition.
+
+Run the Leaflet Mapping Integration App Tracker
 
 ## Usage
 
 ``` r
 leafletOutput(id)
 
-leafletServer(id)
+leafletServer(id, max_hucs = 6)
 
 leafletApp()
 ```
@@ -19,6 +23,11 @@ leafletApp()
 - id:
 
   Module ID
+
+- max_hucs:
+
+  Maximum target number of HUC regions when searching drawn polygon
+  extent (default: 6, can be a numeric or reactive).
 
 ## Value
 

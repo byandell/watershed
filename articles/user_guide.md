@@ -1,0 +1,142 @@
+# User Guide: Interactive Hexagonal Mapping & Topology Data Structure
+
+The **`hexmap`** R package provides interactive discovery of USGS
+Hydrologic Unit Code (HUC) subwatershed boundaries, dynamic feature
+isolation (such as island landmasses via OpenStreetMap), and spatial
+projection of hexagonal substrate grid networks.
+
+This User Guide explains: 1. Interactive map exploration and regional
+search. 2. HUC subwatershed granularity auto-scaling and controls. 3.
+Hexagonal substrate mesh construction and habitat suitability scoring.
+4. The structure and usage of the consolidated single-object **Hexmap
+Topology (.rds)** download.
+
+------------------------------------------------------------------------
+
+## 1. Interactive Map Exploration & Regional Search
+
+The `hexmap` package provides two interactive Shiny applications:
+
+- **[`hexmapApp()`](https://byandell.github.io/hexmap/reference/hexmapApp.md)**:
+  Complete interactive explorer combining Leaflet discovery, HUC
+  selection, feature restriction, hexagon grid diameter sliders, and
+  topology downloads.
+- **[`leafletApp()`](https://byandell.github.io/hexmap/reference/leafletApp.md)**:
+  Standalone Leaflet map explorer focused on point reverse-geocoding and
+  rubberband polygon regional search.
+
+### Discovering Subwatersheds
+
+1.  **Point Reverse-Geocoding:** Click any point on the Leaflet map to
+    identify the enclosing USGS HUC12 subwatershed.
+2.  **Rubberband Polygon Draw Tool:** Use the polygon draw tool (top
+    left of Leaflet map) to outline an arbitrary regional boundary.
+    Click **Search Watersheds in Region** to query overlapping
+    subwatersheds.
+3.  **Map Selection Toggling:** Click any subwatershed shape directly on
+    the map to toggle inclusion (purple outline) or exclusion (dashed
+    red outline).
+4.  **Clearing Regions:** Click **Clear Region** or hit the polygon tool
+    again to reset the map and start a fresh search.
+
+------------------------------------------------------------------------
+
+## 2. HUC Watershed Granularity & Auto-Scaling
+
+USGS NHDPlus organizes watersheds into hierarchical Hydrologic Unit
+Codes (HUC):
+
+| Level     | Code Digits | Description                | Example Extent     |
+|-----------|-------------|----------------------------|--------------------|
+| **HUC12** | 12 digits   | Subwatershed (fine detail) | ~10–40 sq km       |
+| **HUC10** | 10 digits   | Watershed (medium detail)  | ~100–400 sq km     |
+| **HUC08** | 8 digits    | Sub-basin (coarse detail)  | ~1,000–3,000 sq km |
+| **HUC06** | 6 digits    | Basin                      | ~10,000+ sq km     |
+| **HUC04** | 4 digits    | Subregion                  | ~50,000+ sq km     |
+
+### Dynamic Auto-Scaling (Code-Annealing)
+
+When drawing a regional polygon across a large geographic area: - Small
+drawn regions (e.g. a small county) return fine-grained **HUC12**
+subwatersheds. - Large drawn regions (spanning multiple counties or
+states) could return 1000+ HUC12s, cluttering the map and slowing down
+processing. - `hexmap` automatically scales HUC granularity using
+**code-annealed prefix matching** (`HUC12` $`\rightarrow`$`HUC10`
+$`\rightarrow`$`HUC08` $`\rightarrow`$`HUC06` $`\rightarrow`$`HUC04`) to
+keep the total number of returned subwatersheds
+$`\le \text{Max Target HUCs}`$.
+
+### Adjusting Granularity in `hexmapApp()`
+
+Use the **Max Target HUCs (Granularity)** slider in the sidebar
+(default: `6`, range: `3` to `15`): - **Lower values (3–5):** Produces
+fewer, larger parent sub-basins (`HUC08` or `HUC06`). - **Higher values
+(10–15):** Allows more fine-grained subwatersheds (`HUC12` or `HUC10`).
+
+------------------------------------------------------------------------
+
+## 3. Hexagonal Substrate Grid & Habitat Scoring
+
+Once watershed boundaries are selected, `hexmap` projects a regular
+spatial hexagonal grid (`sfc_POLYGON`) across the boundary extent.
+
+- **Hexagon Extent Diameter:** Configurable via sidebar slider in
+  degrees (default: `0.01` degrees, ~1 km).
+- **Habitat Suitability Overlay:** When **Overlay Habitat Features &
+  Landmarks** is enabled, `hexmap` queries OpenStreetMap for ecological
+  features and scores each hex cell:
+  - **Lakes & Ponds:** +2.0 weight
+  - **Waterways & Rivers:** +1.5 weight
+  - **Bogs & Wetlands:** +1.8 weight
+  - **Shaded Forests:** +1.0 weight
+  - **Upland / Open:** 1.0 base weight
+
+------------------------------------------------------------------------
+
+## 4. Consolidated Hexmap Topology Download Object
+
+Clicking **Download Hexmap Topology (.rds)** in
+[`hexmapApp()`](https://byandell.github.io/hexmap/reference/hexmapApp.md)
+exports a single unified S3 object (`habitat_hex_overlay` or
+`watershed_hex_overlay`) containing all spatial layers and metadata.
+
+### Downloaded Object Structure
+
+    topology_object (S3 class: habitat_hex_overlay / watershed_hex_overlay)
+    ├── $layer            : sf / sfc polygon boundary (selected region / feature restriction)
+    ├── $individual_hucs  : sf data frame of individual component subwatersheds
+    ├── $hex_overlay      : sfc polygon geometry list of hexagonal grid cells
+    ├── $hex_habitat_sf   : sf data frame of hex cells with habitat scores & types
+    ├── $habitat_sf       : sf data frame of extracted OpenStreetMap habitat polygons
+    ├── $landmarks_sf     : sf data frame of point sighting landmarks
+    ├── $huc_id           : character vector of selected HUC ID(s)
+    ├── $feature_name     : character string of applied feature restriction (or NULL)
+    └── $hex_diameter     : numeric hexagon extent diameter in degrees
+
+### Inspecting Downloaded Files in R
+
+``` r
+
+library(hexmap)
+library(sf)
+library(ggplot2)
+
+# Load the downloaded topology RDS file
+topo <- readRDS("isle_royale_topology.rds")
+
+# 1. View overall S3 class and metadata
+class(topo)
+cat("HUC ID:", topo$huc_id, "\nFeature:", topo$feature_name, "\n")
+
+# 2. Extract boundary polygon
+boundary_sf <- topo$layer
+
+# 3. Extract individual subwatersheds
+hucs_sf <- topo$individual_hucs
+
+# 4. Extract hexagonal substrate grid with suitability weights
+hex_mesh_sf <- topo$hex_habitat_sf
+
+# 5. Render static ggplot autoplot directly
+autoplot(topo)
+```
