@@ -123,36 +123,46 @@ get_hucs_from_polygon <- function(polygon_sf, max_hucs = 6) {
     }
     
     # 2. Extract HUC12 string IDs for in-memory code-annealed prefix matching
-    huc_col <- if ("huc12" %in% names(res12)) "huc12" else names(res12)[1]
+    cols <- names(res12)
+    huc_col <- NULL
+    for (c in c("huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "id")) {
+      if (c %in% cols) { huc_col <- c; break }
+    }
+    if (is.null(huc_col)) huc_col <- cols[1]
+    
     huc12_ids <- unname(as.character(res12[[huc_col]]))
+    
+    # Extract unique prefixes at each hierarchical level
+    u10 <- unique(substr(huc12_ids, 1, 10))
+    u08 <- unique(substr(huc12_ids, 1, 8))
+    u06 <- unique(substr(huc12_ids, 1, 6))
+    u04 <- unique(substr(huc12_ids, 1, 4))
     
     # Check HUC levels in hierarchical sequence (HUC10 -> HUC8 -> HUC6 -> HUC4)
     target_level <- NULL
     target_ids <- NULL
     
-    u10 <- unique(substr(huc12_ids, 1, 10))
     if (length(u10) <= max_hucs) {
       target_level <- "huc10"
       target_ids <- u10
+    } else if (length(u08) <= max_hucs) {
+      target_level <- "huc08"
+      target_ids <- u08
+    } else if (length(u06) <= max_hucs) {
+      target_level <- "huc06"
+      target_ids <- u06
+    } else if (length(u04) <= max_hucs) {
+      target_level <- "huc04"
+      target_ids <- u04
     } else {
-      u8 <- unique(substr(huc12_ids, 1, 8))
-      if (length(u8) <= max_hucs) {
-        target_level <- "huc8"
-        target_ids <- u8
-      } else {
-        u6 <- unique(substr(huc12_ids, 1, 6))
-        if (length(u6) <= max_hucs) {
-          target_level <- "huc6"
-          target_ids <- u6
-        } else {
-          u4 <- unique(substr(huc12_ids, 1, 4))
-          target_level <- "huc4"
-          target_ids <- u4
-        }
-      }
+      # If region is very large, pick the level with the smallest count to prevent dumping 100s of HUC12s
+      counts <- c(huc04 = length(u04), huc06 = length(u06), huc08 = length(u08), huc10 = length(u10))
+      best_lvl <- names(which.min(counts))
+      target_level <- best_lvl
+      target_ids <- switch(best_lvl, huc04 = u04, huc06 = u06, huc08 = u08, huc10 = u10)
     }
     
-    # 3. Perform a single direct ID lookup for parent level geometries (0 spatial AOI trials)
+    # 3. Perform direct ID lookup for parent level geometries (0 spatial AOI trials)
     if (!is.null(target_level) && !is.null(target_ids)) {
       res_parent <- tryCatch(
         suppressWarnings(nhdplusTools::get_huc(id = target_ids, type = target_level)),

@@ -102,6 +102,15 @@ leafletServer <- function(id, max_hucs = 6) {
       }
     }, ignoreInit = FALSE)
     
+    # Helper to resolve HUC ID column name across all HUC levels
+    get_huc_col <- function(df) {
+      cols <- names(df)
+      for (c in c("huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
+        if (c %in% cols) return(c)
+      }
+      return(cols[1])
+    }
+    
     # Helper function to render HUC polygon shapes with styled included/excluded layers
     render_huc_shapes <- function(hucs, selected_ids) {
       proxy <- leaflet::leafletProxy("mapper", session = session)
@@ -111,7 +120,7 @@ leafletServer <- function(id, max_hucs = 6) {
         return()
       }
       
-      huc_col <- if ("huc12" %in% names(hucs)) "huc12" else if ("huc10" %in% names(hucs)) "huc10" else if ("huc8" %in% names(hucs)) "huc8" else names(hucs)[1]
+      huc_col <- get_huc_col(hucs)
       huc_type <- toupper(huc_col)
       
       hucs_4326 <- sf::st_transform(hucs, 4326)
@@ -166,7 +175,7 @@ leafletServer <- function(id, max_hucs = 6) {
       all_hucs <- all_hucs_sf()
       if (is.null(all_hucs) || nrow(all_hucs) == 0) return()
       
-      huc_col <- if ("huc12" %in% names(all_hucs)) "huc12" else if ("huc10" %in% names(all_hucs)) "huc10" else if ("huc8" %in% names(all_hucs)) "huc8" else names(all_hucs)[1]
+      huc_col <- get_huc_col(all_hucs)
       valid_ids <- unname(as.character(all_hucs[[huc_col]]))
       
       new_inc <- intersect(unname(as.character(new_inc)), valid_ids)
@@ -190,7 +199,7 @@ leafletServer <- function(id, max_hucs = 6) {
       all_hucs <- all_hucs_sf()
       if (is.null(all_hucs) || nrow(all_hucs) == 0) return()
       
-      huc_col <- if ("huc12" %in% names(all_hucs)) "huc12" else if ("huc10" %in% names(all_hucs)) "huc10" else if ("huc8" %in% names(all_hucs)) "huc8" else names(all_hucs)[1]
+      huc_col <- get_huc_col(all_hucs)
       valid_ids <- unname(as.character(all_hucs[[huc_col]]))
       if (!clicked_id %in% valid_ids) return()
       
@@ -209,9 +218,17 @@ leafletServer <- function(id, max_hucs = 6) {
       build_base_map()
     })
     
-    # Track drawing state to ignore vertex clicks while user is drawing rubberband polygon
+    # Track drawing state and clear previous shapes when user hits polygon draw tool again
     shiny::observeEvent(input$mapper_draw_start, {
       is_drawing(TRUE)
+      drawn_polygon_sf(NULL)
+      huc_boundary(NULL)
+      all_hucs_sf(NULL)
+      included_huc_ids(character(0))
+      leaflet::leafletProxy("mapper", session = session) |>
+        leaflet::clearGroup("Drawn Region") |>
+        leaflet::clearGroup("huc_polygons") |>
+        leaflet::clearShapes()
     })
     
     shiny::observeEvent(input$mapper_draw_stop, {
@@ -232,6 +249,10 @@ leafletServer <- function(id, max_hucs = 6) {
     # Observer for Drawn Features (Rubberband polygon)
     shiny::observeEvent(input$mapper_draw_new_feature, {
       is_drawing(FALSE)
+      leaflet::leafletProxy("mapper", session = session) |>
+        leaflet::clearGroup("Drawn Region") |>
+        leaflet::clearGroup("huc_polygons")
+      
       feature <- input$mapper_draw_new_feature
       poly_sf <- parse_drawn_feature(feature)
       if (!is.null(poly_sf)) {
@@ -258,7 +279,10 @@ leafletServer <- function(id, max_hucs = 6) {
       huc_boundary(NULL)
       all_hucs_sf(NULL)
       included_huc_ids(character(0))
-      leaflet::leafletProxy("mapper", session = session) |> leaflet::clearShapes()
+      leaflet::leafletProxy("mapper", session = session) |>
+        leaflet::clearGroup("Drawn Region") |>
+        leaflet::clearGroup("huc_polygons") |>
+        leaflet::clearShapes()
       status_msg("<div style='color:gray;'>Drawn region cleared.</div>")
     })
     
@@ -268,7 +292,10 @@ leafletServer <- function(id, max_hucs = 6) {
       huc_boundary(NULL)
       all_hucs_sf(NULL)
       included_huc_ids(character(0))
-      leaflet::leafletProxy("mapper", session = session) |> leaflet::clearShapes()
+      leaflet::leafletProxy("mapper", session = session) |>
+        leaflet::clearGroup("Drawn Region") |>
+        leaflet::clearGroup("huc_polygons") |>
+        leaflet::clearShapes()
       status_msg("<div style='color:gray;'>Drawn region cleared.</div>")
     })
     
@@ -282,7 +309,7 @@ leafletServer <- function(id, max_hucs = 6) {
         hucs <- get_hucs_from_polygon(poly, max_hucs = get_max_hucs())
         
         if (!is.null(hucs) && nrow(hucs) > 0) {
-          huc_col <- if ("huc12" %in% names(hucs)) "huc12" else if ("huc10" %in% names(hucs)) "huc10" else if ("huc8" %in% names(hucs)) "huc8" else names(hucs)[1]
+          huc_col <- get_huc_col(hucs)
           huc_type <- toupper(huc_col)
           huc_ids <- as.character(hucs[[huc_col]])
           huc_names <- if ("name" %in% names(hucs)) hucs$name else rep("", length(huc_ids))

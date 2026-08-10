@@ -128,7 +128,12 @@ hexmapServer <- function(id) {
       
       # Only trigger updateSelectizeInput if map selection differs from current sidebar selection
       if (!is.null(all_sf) && nrow(all_sf) > 0 && !setequal(inc_ids, current_sel)) {
-        huc_col <- if ("huc12" %in% names(all_sf)) "huc12" else if ("huc10" %in% names(all_sf)) "huc10" else if ("huc8" %in% names(all_sf)) "huc8" else names(all_sf)[1]
+        cols <- names(all_sf)
+        huc_col <- NULL
+        for (c in c("huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
+          if (c %in% cols) { huc_col <- c; break }
+        }
+        if (is.null(huc_col)) huc_col <- cols[1]
         ids <- unname(as.character(all_sf[[huc_col]]))
         names_vec <- if ("name" %in% names(all_sf)) all_sf$name else rep("", length(ids))
         
