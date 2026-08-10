@@ -81,21 +81,36 @@ published to GitHub at
     `"huc04"`) and implemented coarsest-level fallback scaling when
     large regional polygons span 50–1200+ HUC12s, guaranteeing
     condensation down to a small, readable count of 4–6 sub-basins.
-- **Interactive Map Clearing & Granularity Sidebar Control**:
-  - Added a **Max Target HUCs (Granularity)** slider input
-    (`min = 3, max = 15, default = 6`) to
-    [`hexmapInput()`](https://byandell.github.io/hexmap/reference/hexmapApp.md)
-    in
-    [`R/hexmapApp.R`](https://byandell.github.io/hexmap/R/hexmapApp.R),
-    passing a reactive `max_hucs` expression to
-    [`leafletServer()`](https://byandell.github.io/hexmap/reference/leafletApp.md)
-    in
-    [`R/leafletApp.R`](https://byandell.github.io/hexmap/R/leafletApp.R).
+- **Geometric Hexagon Scale & Gray Background Layering**:
+  - Replaced degree diameter sliders with an indexed geometric scale
+    slider (`n_hex_idx`, values: `10, 20, 50, 100, 200, 500, 1000`,
+    default: `100`) in
+    [`R/hexmapApp.R`](https://byandell.github.io/hexmap/R/hexmapApp.R).
+  - Dynamically computes cell diameter
+    $`d = \sqrt{A / (0.65 \times N)}`$ based on region bounding box area
+    $`A`$, guaranteeing consistent grid cell density across both small
+    islands and multi-state regional watersheds.
+  - Rendered hex grid in subtle slate gray (`#7F8C8D`) and positioned it
+    **behind** HUC boundaries in Leaflet maps and `ggplot2` autoplots
+    ([`R/leaflet.R`](https://byandell.github.io/hexmap/R/leaflet.R),
+    [`R/watershed.R`](https://byandell.github.io/hexmap/R/watershed.R),
+    [`R/habitat.R`](https://byandell.github.io/hexmap/R/habitat.R)).
+  - Added an **Include Hexagonal Grid Overlay** checkbox (`enable_hex`)
+    allowing users to toggle hex mesh generation on or off while
+    retaining watershed boundaries and habitat overlays.
+- **Interactive Map Clearing & Reorganized Sidebar**:
+  - Reorganized sidebar UI controls in
+    [`hexmapInput()`](https://byandell.github.io/hexmap/reference/hexmapApp.md),
+    placing primary grid settings at the top and moving the selected
+    HUCs multi-select list to the bottom.
   - Updated Leaflet draw observers (`input$clear_region`,
     `input$mapper_draw_start`, `input$mapper_draw_new_feature`) to purge
     previous drawn rubberband shapes (`clearGroup("Drawn Region")`) and
     HUC shapes (`clearGroup("huc_polygons")`) when clicking “Clear
     Region” or starting a new polygon draw operation.
+  - Disabled automatic point reverse-geocoding network calls on map
+    background taps (`input$mapper_click`), preventing unexpected
+    latency while panning or zooming.
 - **Consolidated Single-Object Download**:
   - Consolidated sidebar download options in
     [`R/hexmapApp.R`](https://byandell.github.io/hexmap/R/hexmapApp.R)

@@ -33,7 +33,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hexmap</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -181,20 +181,43 @@ count of 4–6 sub-basins.</li>
 </ul>
 </li>
 <li>
-<strong>Interactive Map Clearing &amp; Granularity Sidebar
-Control</strong>:
+<strong>Geometric Hexagon Scale &amp; Gray Background
+Layering</strong>:
 <ul>
-<li>Added a <strong>Max Target HUCs (Granularity)</strong> slider input
-(<code>min = 3, max = 15, default = 6</code>) to
-<code><a href="../reference/hexmapApp.html">hexmapInput()</a></code> in <a href="../R/hexmapApp.R"><code>R/hexmapApp.R</code></a>, passing a
-reactive <code>max_hucs</code> expression to
-<code><a href="../reference/leafletApp.html">leafletServer()</a></code> in <a href="../R/leafletApp.R"><code>R/leafletApp.R</code></a>.</li>
+<li>Replaced degree diameter sliders with an indexed geometric scale
+slider (<code>n_hex_idx</code>, values:
+<code>10, 20, 50, 100, 200, 500, 1000</code>, default: <code>100</code>)
+in <a href="../R/hexmapApp.R"><code>R/hexmapApp.R</code></a>.</li>
+<li>Dynamically computes cell diameter
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mo>=</mo><msqrt><mrow><mi>A</mi><mi>/</mi><mo stretchy="false" form="prefix">(</mo><mn>0.65</mn><mo>×</mo><mi>N</mi><mo stretchy="false" form="postfix">)</mo></mrow></msqrt></mrow><annotation encoding="application/x-tex">d = \sqrt{A / (0.65 \times N)}</annotation></semantics></math>
+based on region bounding box area
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>,
+guaranteeing consistent grid cell density across both small islands and
+multi-state regional watersheds.</li>
+<li>Rendered hex grid in subtle slate gray (<code>#7F8C8D</code>) and
+positioned it <strong>behind</strong> HUC boundaries in Leaflet maps and
+<code>ggplot2</code> autoplots (<a href="../R/leaflet.R"><code>R/leaflet.R</code></a>, <a href="../R/watershed.R"><code>R/watershed.R</code></a>, <a href="../R/habitat.R"><code>R/habitat.R</code></a>).</li>
+<li>Added an <strong>Include Hexagonal Grid Overlay</strong> checkbox
+(<code>enable_hex</code>) allowing users to toggle hex mesh generation
+on or off while retaining watershed boundaries and habitat
+overlays.</li>
+</ul>
+</li>
+<li>
+<strong>Interactive Map Clearing &amp; Reorganized Sidebar</strong>:
+<ul>
+<li>Reorganized sidebar UI controls in <code><a href="../reference/hexmapApp.html">hexmapInput()</a></code>,
+placing primary grid settings at the top and moving the selected HUCs
+multi-select list to the bottom.</li>
 <li>Updated Leaflet draw observers (<code>input$clear_region</code>,
 <code>input$mapper_draw_start</code>,
 <code>input$mapper_draw_new_feature</code>) to purge previous drawn
 rubberband shapes (<code>clearGroup("Drawn Region")</code>) and HUC
 shapes (<code>clearGroup("huc_polygons")</code>) when clicking “Clear
 Region” or starting a new polygon draw operation.</li>
+<li>Disabled automatic point reverse-geocoding network calls on map
+background taps (<code>input$mapper_click</code>), preventing unexpected
+latency while panning or zooming.</li>
 </ul>
 </li>
 <li>

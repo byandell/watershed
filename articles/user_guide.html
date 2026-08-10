@@ -33,7 +33,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hexmap</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -80,9 +80,10 @@ OpenStreetMap), and spatial projection of hexagonal substrate grid
 networks.</p>
 <p>This User Guide explains: 1. Interactive map exploration and regional
 search. 2. HUC subwatershed granularity auto-scaling and controls. 3.
-Hexagonal substrate mesh construction and habitat suitability scoring.
-4. The structure and usage of the consolidated single-object
-<strong>Hexmap Topology (.rds)</strong> download.</p>
+Hexagonal substrate mesh construction, geometric scale selection, and
+habitat suitability scoring. 4. The structure and usage of the
+consolidated single-object <strong>Hexmap Topology (.rds)</strong>
+download.</p>
 <hr>
 <div class="section level2">
 <h2 id="interactive-map-exploration-regional-search">1. Interactive Map Exploration &amp; Regional Search<a class="anchor" aria-label="anchor" href="#interactive-map-exploration-regional-search"></a>
@@ -104,9 +105,6 @@ regional search.</li>
 </h3>
 <ol style="list-style-type: decimal">
 <li>
-<strong>Point Reverse-Geocoding:</strong> Click any point on the
-Leaflet map to identify the enclosing USGS HUC12 subwatershed.</li>
-<li>
 <strong>Rubberband Polygon Draw Tool:</strong> Use the polygon draw
 tool (top left of Leaflet map) to outline an arbitrary regional
 boundary. Click <strong>Search Watersheds in Region</strong> to query
@@ -114,7 +112,12 @@ overlapping subwatersheds.</li>
 <li>
 <strong>Map Selection Toggling:</strong> Click any subwatershed
 shape directly on the map to toggle inclusion (purple outline) or
-exclusion (dashed red outline).</li>
+exclusion (dashed red outline) in-memory without making network API
+calls.</li>
+<li>
+<strong>No Unintentional Tapping Calls:</strong> Tapping the map
+background does not generate network API calls, preventing unexpected
+latency while panning or zooming.</li>
 <li>
 <strong>Clearing Regions:</strong> Click <strong>Clear
 Region</strong> or hit the polygon tool again to reset the map and start
@@ -203,20 +206,41 @@ subwatersheds (<code>HUC12</code> or <code>HUC10</code>).</p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="hexagonal-substrate-grid-habitat-scoring">3. Hexagonal Substrate Grid &amp; Habitat Scoring<a class="anchor" aria-label="anchor" href="#hexagonal-substrate-grid-habitat-scoring"></a>
+<h2 id="hexagonal-substrate-grid-geometric-scale-selection">3. Hexagonal Substrate Grid &amp; Geometric Scale Selection<a class="anchor" aria-label="anchor" href="#hexagonal-substrate-grid-geometric-scale-selection"></a>
 </h2>
-<p>Once watershed boundaries are selected, <code>hexmap</code> projects
-a regular spatial hexagonal grid (<code>sfc_POLYGON</code>) across the
-boundary extent.</p>
+<p>Once watershed boundaries are selected, <code>hexmap</code> can
+optionally project a regular spatial hexagonal grid
+(<code>sfc_POLYGON</code>) across the boundary extent.</p>
 <ul>
+<li><p><strong>Optional Hex Overlay:</strong> Unchecking <strong>Include
+Hexagonal Grid Overlay</strong> skips hex grid construction, returning
+pure watershed boundaries, subwatersheds, and habitat features with
+<code>hex_overlay = NULL</code>.</p></li>
+<li><p><strong>Geometric Hexagon Scale (10 to 1,000):</strong> Users
+adjust the <strong>Approximate Number of Hexagons</strong> slider across
+geometric steps:
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mtext mathvariant="normal">Target Hexagons </mtext><mspace width="0.333em"></mspace></mrow><mi>N</mi><mo>∈</mo><mo stretchy="false" form="prefix">{</mo><mn>10</mn><mo>,</mo><mn>20</mn><mo>,</mo><mn>50</mn><mo>,</mo><mn>100</mn><mo>,</mo><mn>200</mn><mo>,</mo><mn>500</mn><mo>,</mo><mn>1000</mn><mo stretchy="false" form="postfix">}</mo></mrow><annotation encoding="application/x-tex">\text{Target Hexagons } N \in \{10, 20, 50, 100, 200, 500, 1000\}</annotation></semantics></math>
+(Default: <code>100</code> hexagons).</p></li>
+<li><p><strong>Area-Based Diameter Calculation:</strong>
+<code>hexmap</code> computes the bounding box area
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+of the active region and automatically solves for the cell diameter
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math>:
+<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mo>=</mo><msqrt><mfrac><mi>A</mi><mrow><mn>0.65</mn><mo>×</mo><mi>N</mi></mrow></mfrac></msqrt></mrow><annotation encoding="application/x-tex">d = \sqrt{\frac{A}{0.65 \times N}}</annotation></semantics></math>
+This guarantees that choosing
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>N</mi><mo>=</mo><mn>100</mn></mrow><annotation encoding="application/x-tex">N = 100</annotation></semantics></math>
+hexagons will ALWAYS generate ~100 grid cells regardless of whether the
+target region is a small island or a multi-state watershed.</p></li>
+<li><p><strong>Gray Color &amp; Background Layering:</strong> The
+hexagonal substrate grid is rendered in subtle slate gray
+(<code>#7F8C8D</code>) and positioned <strong>behind</strong> the HUC
+watershed boundaries in both Leaflet maps and <code>ggplot2</code>
+autoplots, keeping watershed boundaries bold and prominent.</p></li>
 <li>
-<strong>Hexagon Extent Diameter:</strong> Configurable via sidebar
-slider in degrees (default: <code>0.01</code> degrees, ~1 km).</li>
-<li>
-<strong>Habitat Suitability Overlay:</strong> When <strong>Overlay
-Habitat Features &amp; Landmarks</strong> is enabled,
+<p><strong>Habitat Suitability Overlay:</strong> When
+<strong>Overlay Habitat Features &amp; Landmarks</strong> is enabled,
 <code>hexmap</code> queries OpenStreetMap for ecological features and
-scores each hex cell:
+scores each hex cell:</p>
 <ul>
 <li>
 <strong>Lakes &amp; Ponds:</strong> +2.0 weight</li>
@@ -246,13 +270,13 @@ containing all spatial layers and metadata.</p>
 <pre><code>topology_object (S3 class: habitat_hex_overlay / watershed_hex_overlay)
 ├── $layer            : sf / sfc polygon boundary (selected region / feature restriction)
 ├── $individual_hucs  : sf data frame of individual component subwatersheds
-├── $hex_overlay      : sfc polygon geometry list of hexagonal grid cells
-├── $hex_habitat_sf   : sf data frame of hex cells with habitat scores &amp; types
+├── $hex_overlay      : sfc polygon geometry list of hexagonal grid cells (or NULL if disabled)
+├── $hex_habitat_sf   : sf data frame of hex cells with habitat scores &amp; types (or NULL if disabled)
 ├── $habitat_sf       : sf data frame of extracted OpenStreetMap habitat polygons
 ├── $landmarks_sf     : sf data frame of point sighting landmarks
 ├── $huc_id           : character vector of selected HUC ID(s)
 ├── $feature_name     : character string of applied feature restriction (or NULL)
-└── $hex_diameter     : numeric hexagon extent diameter in degrees</code></pre>
+└── $hex_diameter     : numeric hexagon extent diameter in degrees (or NULL if disabled)</code></pre>
 </div>
 <div class="section level3">
 <h3 id="inspecting-downloaded-files-in-r">Inspecting Downloaded Files in R<a class="anchor" aria-label="anchor" href="#inspecting-downloaded-files-in-r"></a>
@@ -275,8 +299,11 @@ containing all spatial layers and metadata.</p>
 <span><span class="co"># 3. Extract individual subwatersheds</span></span>
 <span><span class="va">hucs_sf</span> <span class="op">&lt;-</span> <span class="va">topo</span><span class="op">$</span><span class="va">individual_hucs</span></span>
 <span></span>
-<span><span class="co"># 4. Extract hexagonal substrate grid with suitability weights</span></span>
-<span><span class="va">hex_mesh_sf</span> <span class="op">&lt;-</span> <span class="va">topo</span><span class="op">$</span><span class="va">hex_habitat_sf</span></span>
+<span><span class="co"># 4. Extract hexagonal substrate grid with suitability weights (if enabled)</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">topo</span><span class="op">$</span><span class="va">hex_habitat_sf</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">hex_mesh_sf</span> <span class="op">&lt;-</span> <span class="va">topo</span><span class="op">$</span><span class="va">hex_habitat_sf</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">hex_mesh_sf</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
 <span></span>
 <span><span class="co"># 5. Render static ggplot autoplot directly</span></span>
 <span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/autoplot.html" class="external-link">autoplot</a></span><span class="op">(</span><span class="va">topo</span><span class="op">)</span></span></code></pre></div>

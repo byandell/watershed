@@ -7,9 +7,9 @@ projection of hexagonal substrate grid networks.
 
 This User Guide explains: 1. Interactive map exploration and regional
 search. 2. HUC subwatershed granularity auto-scaling and controls. 3.
-Hexagonal substrate mesh construction and habitat suitability scoring.
-4. The structure and usage of the consolidated single-object **Hexmap
-Topology (.rds)** download.
+Hexagonal substrate mesh construction, geometric scale selection, and
+habitat suitability scoring. 4. The structure and usage of the
+consolidated single-object **Hexmap Topology (.rds)** download.
 
 ------------------------------------------------------------------------
 
@@ -27,15 +27,16 @@ The `hexmap` package provides two interactive Shiny applications:
 
 ### Discovering Subwatersheds
 
-1.  **Point Reverse-Geocoding:** Click any point on the Leaflet map to
-    identify the enclosing USGS HUC12 subwatershed.
-2.  **Rubberband Polygon Draw Tool:** Use the polygon draw tool (top
+1.  **Rubberband Polygon Draw Tool:** Use the polygon draw tool (top
     left of Leaflet map) to outline an arbitrary regional boundary.
     Click **Search Watersheds in Region** to query overlapping
     subwatersheds.
-3.  **Map Selection Toggling:** Click any subwatershed shape directly on
+2.  **Map Selection Toggling:** Click any subwatershed shape directly on
     the map to toggle inclusion (purple outline) or exclusion (dashed
-    red outline).
+    red outline) in-memory without making network API calls.
+3.  **No Unintentional Tapping Calls:** Tapping the map background does
+    not generate network API calls, preventing unexpected latency while
+    panning or zooming.
 4.  **Clearing Regions:** Click **Clear Region** or hit the polygon tool
     again to reset the map and start a fresh search.
 
@@ -75,16 +76,43 @@ fewer, larger parent sub-basins (`HUC08` or `HUC06`). - **Higher values
 
 ------------------------------------------------------------------------
 
-## 3. Hexagonal Substrate Grid & Habitat Scoring
+## 3. Hexagonal Substrate Grid & Geometric Scale Selection
 
-Once watershed boundaries are selected, `hexmap` projects a regular
-spatial hexagonal grid (`sfc_POLYGON`) across the boundary extent.
+Once watershed boundaries are selected, `hexmap` can optionally project
+a regular spatial hexagonal grid (`sfc_POLYGON`) across the boundary
+extent.
 
-- **Hexagon Extent Diameter:** Configurable via sidebar slider in
-  degrees (default: `0.01` degrees, ~1 km).
+- **Optional Hex Overlay:** Unchecking **Include Hexagonal Grid
+  Overlay** skips hex grid construction, returning pure watershed
+  boundaries, subwatersheds, and habitat features with
+  `hex_overlay = NULL`.
+
+- **Geometric Hexagon Scale (10 to 1,000):** Users adjust the
+  **Approximate Number of Hexagons** slider across geometric steps:
+  ``` math
+  \text{Target Hexagons } N \in \{10, 20, 50, 100, 200, 500, 1000\}
+  ```
+  (Default: `100` hexagons).
+
+- **Area-Based Diameter Calculation:** `hexmap` computes the bounding
+  box area $`A`$ of the active region and automatically solves for the
+  cell diameter $`d`$:
+  ``` math
+  d = \sqrt{\frac{A}{0.65 \times N}}
+  ```
+  This guarantees that choosing $`N = 100`$ hexagons will ALWAYS
+  generate ~100 grid cells regardless of whether the target region is a
+  small island or a multi-state watershed.
+
+- **Gray Color & Background Layering:** The hexagonal substrate grid is
+  rendered in subtle slate gray (`#7F8C8D`) and positioned **behind**
+  the HUC watershed boundaries in both Leaflet maps and `ggplot2`
+  autoplots, keeping watershed boundaries bold and prominent.
+
 - **Habitat Suitability Overlay:** When **Overlay Habitat Features &
   Landmarks** is enabled, `hexmap` queries OpenStreetMap for ecological
   features and scores each hex cell:
+
   - **Lakes & Ponds:** +2.0 weight
   - **Waterways & Rivers:** +1.5 weight
   - **Bogs & Wetlands:** +1.8 weight
@@ -105,13 +133,13 @@ exports a single unified S3 object (`habitat_hex_overlay` or
     topology_object (S3 class: habitat_hex_overlay / watershed_hex_overlay)
     ├── $layer            : sf / sfc polygon boundary (selected region / feature restriction)
     ├── $individual_hucs  : sf data frame of individual component subwatersheds
-    ├── $hex_overlay      : sfc polygon geometry list of hexagonal grid cells
-    ├── $hex_habitat_sf   : sf data frame of hex cells with habitat scores & types
+    ├── $hex_overlay      : sfc polygon geometry list of hexagonal grid cells (or NULL if disabled)
+    ├── $hex_habitat_sf   : sf data frame of hex cells with habitat scores & types (or NULL if disabled)
     ├── $habitat_sf       : sf data frame of extracted OpenStreetMap habitat polygons
     ├── $landmarks_sf     : sf data frame of point sighting landmarks
     ├── $huc_id           : character vector of selected HUC ID(s)
     ├── $feature_name     : character string of applied feature restriction (or NULL)
-    └── $hex_diameter     : numeric hexagon extent diameter in degrees
+    └── $hex_diameter     : numeric hexagon extent diameter in degrees (or NULL if disabled)
 
 ### Inspecting Downloaded Files in R
 
@@ -134,8 +162,11 @@ boundary_sf <- topo$layer
 # 3. Extract individual subwatersheds
 hucs_sf <- topo$individual_hucs
 
-# 4. Extract hexagonal substrate grid with suitability weights
-hex_mesh_sf <- topo$hex_habitat_sf
+# 4. Extract hexagonal substrate grid with suitability weights (if enabled)
+if (!is.null(topo$hex_habitat_sf)) {
+  hex_mesh_sf <- topo$hex_habitat_sf
+  head(hex_mesh_sf)
+}
 
 # 5. Render static ggplot autoplot directly
 autoplot(topo)
