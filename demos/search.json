@@ -1,0 +1,37 @@
+[
+  {
+    "objectID": "hexmapApp.html",
+    "href": "hexmapApp.html",
+    "title": "hexmapApp (Hexagonal Watershed Explorer)",
+    "section": "",
+    "text": "← Back to Demos Gallery\nThe hexmapApp() application provides an interactive interface for discovering USGS subwatersheds, isolating specific geographic features (such as island landmasses), and projecting spatial hexagonal substrate networks for quantitative population ethology simulations."
+  },
+  {
+    "objectID": "hexmapApp.html#interactive-application-usage",
+    "href": "hexmapApp.html#interactive-application-usage",
+    "title": "hexmapApp (Hexagonal Watershed Explorer)",
+    "section": "Interactive Application Usage",
+    "text": "Interactive Application Usage\nYou can launch the interactive application natively in R:\nlibrary(hexmap)\n\n# Launch interactive Shiny app\nhexmapApp()\n\n[!NOTE] Live Deployment: The interactive application requires dynamic spatial intersection libraries (sf) and live USGS / OpenStreetMap API access. It is deployed live on Posit Connect (HexMap)."
+  },
+  {
+    "objectID": "hexmapApp.html#workflow-example-isle-royale-watershed-projection",
+    "href": "hexmapApp.html#workflow-example-isle-royale-watershed-projection",
+    "title": "hexmapApp (Hexagonal Watershed Explorer)",
+    "section": "Workflow Example: Isle Royale Watershed Projection",
+    "text": "Workflow Example: Isle Royale Watershed Projection\nBelow is an example showing how get_watershed() retrieves the USGS HUC12 subwatershed boundary (041800000101), clips it to the Isle Royale landmass using OpenStreetMap nominatim geometry (when osmdata is available), and overlays a spatial hexagonal grid (add_watershed_hex_overlay).\n\nlibrary(hexmap)\nlibrary(ggplot2)\n\n# Check if osmdata is installed for feature boundary restriction\nfeat_name &lt;- if (requireNamespace(\"osmdata\", quietly = TRUE)) \"Isle Royale\" else NULL\n\n# 1. Fetch HUC12 boundary (optionally restricted to Isle Royale island landmass)\nhuc_info &lt;- get_watershed(\"041800000101\", feature_name = feat_name)\n\n# 2. Construct spatial hexagonal overlay mesh (diameter = 0.01 degrees)\nhex_obj &lt;- add_watershed_hex_overlay(huc_info, hex_diameter = 0.01)\n\n# 3. Visualize using autoplot\nggplot2::autoplot(hex_obj)"
+  },
+  {
+    "objectID": "hexmapApp.html#technical-features",
+    "href": "hexmapApp.html#technical-features",
+    "title": "hexmapApp (Hexagonal Watershed Explorer)",
+    "section": "Technical Features",
+    "text": "Technical Features\n\nLeaflet Spatial Discovery: Click any location on North America or search landmark strings to reverse-geocode coordinates into USGS HUC12 subwatershed IDs (get_huc_from_point).\nFeature Isolation: Clip large HUC boundaries covering open water to target landmasses (e.g. Isle Royale) using osmdata::getbb().\nHexagonal Mesh Scaling: Parameterize cell extent diameter to scale spatial resolution dynamically."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "hexmap Demos & Gallery",
+    "section": "",
+    "text": "Welcome to the hexmap demonstration gallery!\n\n\n\n ::: {.card-body} ### hexmapApp (Hexagonal Watershed Explorer) Interactive Leaflet discovery of USGS subwatersheds, geographic feature restriction (Isle Royale), and hexagonal substrate grid overlays.\n\n\n\n:::"
+  }
+]
