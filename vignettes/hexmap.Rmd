@@ -46,5 +46,9 @@ The **`hexmap`** R package was extracted from `ewing` into a standalone reposito
   - Added a **Max Target HUCs (Granularity)** slider input (`min = 3, max = 15, default = 6`) to `hexmapInput()` in [`R/hexmapApp.R`](../R/hexmapApp.R), passing a reactive `max_hucs` expression to `leafletServer()` in [`R/leafletApp.R`](../R/leafletApp.R).
   - Updated Leaflet draw observers (`input$clear_region`, `input$mapper_draw_start`, `input$mapper_draw_new_feature`) to purge previous drawn rubberband shapes (`clearGroup("Drawn Region")`) and HUC shapes (`clearGroup("huc_polygons")`) when clicking "Clear Region" or starting a new polygon draw operation.
 
+- **Consolidated Single-Object Download**:
+  - Consolidated sidebar download options in [`R/hexmapApp.R`](../R/hexmapApp.R) into a single **Download Hexmap Topology (.rds)** button (`download_hexmap`).
+  - Downloads a single unified S3 spatial topology object containing all layers (`layer` boundary `sf`, `individual_hucs` `sf`, `hex_overlay` `sfc`, `hex_habitat_sf` suitability `sf`, `habitat_sf` features `sf`, and `landmarks_sf` POI points) rather than separate files.
+
 - **Prompt Overhead Optimization Guidelines**:
   - Streamlined [`AGENTS.md`](../AGENTS.md) developer guidelines to reduce prompt token overhead by ~83% while retaining all essential package build rules and specifying that automatic `devtools::check()` and `devtools::document()` runs be skipped on routine edits.

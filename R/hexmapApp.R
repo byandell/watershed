@@ -5,26 +5,30 @@
 #'
 #' @param id Module ID
 #' @export
-#' @importFrom shiny NS tagList h4 p textInput uiOutput sliderInput actionButton br HTML selectizeInput downloadButton checkboxInput
+#' @importFrom shiny NS tagList h4 h5 p textInput uiOutput sliderInput actionButton br HTML selectizeInput downloadButton checkboxInput
 #' @rdname hexmapApp
 hexmapInput <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
-    shiny::h4("Interactive Hexagonal Watershed Controls"),
-    shiny::p(shiny::HTML('Search, click, or outline a rubberband region on the Leaflet map, or manage selected HUCs below.')),
-    shiny::uiOutput(ns("huc_selector")),
-    shiny::uiOutput(ns("feature_selector")),
-    shiny::checkboxInput(ns("show_habitat"), "Overlay Moose Habitat Features & Landmarks", value = TRUE),
+    shiny::h4("Hexagonal Watershed Controls"),
+    shiny::p(shiny::HTML("Search or outline a region on the Leaflet map, configure grid options, and generate hex topology.")),
+    
     shiny::sliderInput(ns("max_hucs"), "Max Target HUCs (Granularity):", 
                        min = 3, max = 15, value = 6, step = 1),
     shiny::sliderInput(ns("hex_diameter"), "Hexagon Extent Diameter (Degrees):", 
                        min = 0.001, max = 0.05, value = 0.01, step = 0.001),
-    shiny::actionButton(ns("update"), "Generate Hex Topology", class = "btn-primary", style = "width: 100%;"),
-    shiny::HTML("<hr style='margin: 10px 0;'/>"),
-    shiny::downloadButton(ns("download_features"), "Download Habitat Features (.rds)", class = "btn-secondary", style = "margin-bottom: 6px; width: 100%;"),
-    shiny::downloadButton(ns("download_landmarks"), "Download Sighting Landmarks (.rds)", class = "btn-secondary", style = "width: 100%;"),
-    shiny::br(), shiny::br(),
-    shiny::uiOutput(ns("status"))
+    shiny::checkboxInput(ns("show_habitat"), "Overlay Habitat Features & Landmarks", value = TRUE),
+    shiny::uiOutput(ns("feature_selector")),
+    
+    shiny::actionButton(ns("update"), "Generate Hex Topology", class = "btn-primary", style = "width: 100%; margin-top: 5px;"),
+    shiny::downloadButton(ns("download_hexmap"), "Download Hexmap Topology (.rds)", class = "btn-secondary", style = "width: 100%; margin-top: 6px;"),
+    
+    shiny::br(),
+    shiny::uiOutput(ns("status")),
+    
+    shiny::HTML("<hr style='margin: 15px 0;'/>"),
+    shiny::h5("Selected Watersheds (HUCs)"),
+    shiny::uiOutput(ns("huc_selector"))
   )
 }
 
@@ -281,32 +285,17 @@ hexmapServer <- function(id) {
       ggplot2::autoplot(hex_obj())
     })
     
-    # Download Handlers for Extracted Spatial Features & Landmarks (.rds)
-    output$download_features <- shiny::downloadHandler(
+    # Download Handler for Consolidated Hexmap Spatial Topology Object (.rds)
+    output$download_hexmap <- shiny::downloadHandler(
       filename = function() {
         feat_name <- input$feature_name
-        if (is.null(feat_name) || trimws(feat_name) == "") feat_name <- "site"
-        paste0(gsub("[^A-Za-z0-9]", "_", tolower(feat_name)), "_features.rds")
+        if (is.null(feat_name) || trimws(feat_name) == "") feat_name <- "hexmap"
+        paste0(gsub("[^A-Za-z0-9]", "_", tolower(feat_name)), "_topology.rds")
       },
       content = function(file) {
         obj <- hex_obj()
-        sf_data <- if (!is.null(obj) && !is.null(obj$habitat_sf)) obj$habitat_sf else NULL
-        if (is.null(sf_data)) sf_data <- data.frame()
-        saveRDS(sf_data, file)
-      }
-    )
-    
-    output$download_landmarks <- shiny::downloadHandler(
-      filename = function() {
-        feat_name <- input$feature_name
-        if (is.null(feat_name) || trimws(feat_name) == "") feat_name <- "site"
-        paste0(gsub("[^A-Za-z0-9]", "_", tolower(feat_name)), "_landmarks.rds")
-      },
-      content = function(file) {
-        obj <- hex_obj()
-        sf_data <- if (!is.null(obj) && !is.null(obj$landmarks_sf)) obj$landmarks_sf else NULL
-        if (is.null(sf_data)) sf_data <- data.frame()
-        saveRDS(sf_data, file)
+        if (is.null(obj)) obj <- list()
+        saveRDS(obj, file)
       }
     )
     
@@ -315,17 +304,9 @@ hexmapServer <- function(id) {
       shiny::HTML(status_msg())
     })
     
-    # Return reactive list of spatial objects for downstream composition & site prototyping
+    # Return reactive S3 object containing watershed boundary sf, individual HUCs sf, habitat sf, landmarks sf, and hex mesh sf
     list(
       hex_obj = hex_obj,
-      habitat_sf = shiny::reactive({
-        obj <- hex_obj()
-        if (!is.null(obj) && !is.null(obj$habitat_sf)) obj$habitat_sf else NULL
-      }),
-      landmarks_sf = shiny::reactive({
-        obj <- hex_obj()
-        if (!is.null(obj) && !is.null(obj$landmarks_sf)) obj$landmarks_sf else NULL
-      }),
       huc_info = huc_info
     )
   })
