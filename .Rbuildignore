@@ -6,4 +6,6 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^Rplots\.pdf$
+^AGENTS\.md$
+
 
