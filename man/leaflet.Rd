@@ -17,7 +17,7 @@ get_hucs_from_polygon(polygon_sf, max_hucs = 6)
 add_leaflet_hex_overlay(
   map,
   hex_obj,
-  hex_color = "#C0392B",
+  hex_color = "#7F8C8D",
   bound_color = "#2980B9"
 )
 }
