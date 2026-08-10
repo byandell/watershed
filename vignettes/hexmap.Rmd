@@ -31,3 +31,18 @@ The **`hexmap`** R package was extracted from `ewing` into a standalone reposito
 - **R CMD Check Validation**: Corrected S3 method exports (`@exportS3Method ggplot2::autoplot`), suppressed spherical geometry (`s2`) messages and planar warnings, declared global variables, and verified **`0 errors | 0 warnings | 0 notes (Status: OK)`**.
 - **Quarto Gallery & Hotlink Fix**: Formatted card containers in [`demos/index.qmd`](../demos/index.qmd) using 4-colon outer fences (`:::: {.grid}`) and added Bootstrap `.stretched-link` styling so clicking anywhere on a demo card navigates to its page.
 - **GitHub Integration**: Initialized remote repository `byandell/hexmap` via `usethis::use_github()`, configured issue tracker links, and published documentation to [https://byandell.github.io/hexmap/](https://byandell.github.io/hexmap/).
+
+## 3. Recent Enhancements & Granularity Controls
+
+- **Transparent Polygon & Watershed Styling**:
+  - Configured Leaflet and `ggplot2` autoplots ([`R/leaflet.R`](../R/leaflet.R), [`R/leafletApp.R`](../R/leafletApp.R), [`R/watershed.R`](../R/watershed.R), [`R/habitat.R`](../R/habitat.R)) to use transparent fills (`fillOpacity = 0` / `fill = NA`) for drawn regions, subwatershed boundaries, and hexagonal substrate meshes while maintaining distinct border outlines and click interactivity.
+
+- **Zero-Overhead Code-Annealed HUC Scaling**:
+  - Enhanced `get_hucs_from_polygon(polygon_sf, max_hucs = 6)` to auto-scale HUC subwatershed granularity dynamically based on the extent of a user-drawn bounding polygon.
+  - Inspects 12-digit HUC string prefixes in memory (`HUC12` $\rightarrow$ `HUC10` $\rightarrow$ `HUC8` $\rightarrow$ `HUC6` $\rightarrow$ `HUC4`) after a single HUC12 spatial AOI query, selecting the finest level with $\le \text{max\_hucs}$ regions. Fetches parent geometries via a single direct ID query (`nhdplusTools::get_huc(id = target_ids, type = target_level)`), eliminating trial-and-error WFS network overhead.
+
+- **Interactive Granularity Sidebar Option**:
+  - Added a **Max Target HUCs (Granularity)** slider input (`min = 3, max = 15, default = 6`) to `hexmapInput()` in [`R/hexmapApp.R`](../R/hexmapApp.R), passing a reactive `max_hucs` expression to `leafletServer()` in [`R/leafletApp.R`](../R/leafletApp.R).
+
+- **Prompt Overhead Optimization**:
+  - Streamlined [`AGENTS.md`](../AGENTS.md) developer guidelines to reduce prompt token overhead by ~83% while retaining all essential package build rules and quality standards.
