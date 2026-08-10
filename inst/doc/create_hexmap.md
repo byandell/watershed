@@ -159,4 +159,13 @@ The **`hexmap`** R package repository has been initialized and set up in [`~/Doc
    - Verified clean R parsing and installed `hexmap` locally (`0 errors`).
    - Rendered Quarto demo (`quarto render demos/hexmapApp.qmd`), producing `docs/demos/hexmapApp.html`.
 
-For a full breakdown of the files and verification results, see the [Walkthrough](file:///Users/brianyandell/.gemini/antigravity-ide/brain/67d10116-efa4-4b8f-be5f-6d306af73acd/walkthrough.md). You can now stage, commit, and push the repository to GitHub!
+6. **Post-Creation Refinements & GitHub Integration**:
+   - **GitHub Repository Initialization**: Created and linked `byandell/hexmap` on GitHub via `usethis::use_github()`. Updated `DESCRIPTION` with pkgdown site URL (`https://byandell.github.io/hexmap/`) and issue tracker link.
+   - **AI Agent Guidelines (`AGENTS.md`)**: Created root [`AGENTS.md`](file:///Users/brianyandell/Documents/GitHub/hexmap/AGENTS.md) documenting core package functions, workflows, dependencies, and coding conventions. Added `^AGENTS\.md$` to `.Rbuildignore`.
+   - **R CMD Check & S3 Method Registration**:
+     - Registered `autoplot` S3 methods via `#' @exportS3Method ggplot2::autoplot` in `R/habitat.R` and `R/watershed.R`.
+     - Suppressed spherical geometry (`s2`) messages and `st_intersects` / `st_point_on_surface` planar warnings using `suppressMessages()` and `suppressWarnings()`.
+     - Declared global variables `.data` and `isle_royale_datasets` via `utils::globalVariables()` in `R/habitat.R`.
+     - Verified `devtools::check()` finishes with **0 errors, 0 warnings, 0 notes (Status: OK)**.
+   - **Quarto Gallery Layout Fix**: Resolved raw fenced div rendering issue in `demos/index.qmd` by adopting 4-colon outer containers (`:::: {.grid}`) and proper blank line spacing, producing clean Bootstrap cards in `docs/demos/index.html`.
+
