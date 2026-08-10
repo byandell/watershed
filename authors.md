@@ -11,12 +11,12 @@ Source:
 
 Yandell B (2026). *hexmap: Interactive Hexagonal Watershed Mapping and
 Spatial Projection*. R package version 0.1.0,
-<https://github.com/byandell/hexmap>.
+<https://byandell.github.io/hexmap/>.
 
     @Manual{,
       title = {hexmap: Interactive Hexagonal Watershed Mapping and Spatial Projection},
       author = {Brian S. Yandell},
       year = {2026},
       note = {R package version 0.1.0},
-      url = {https://github.com/byandell/hexmap},
+      url = {https://byandell.github.io/hexmap/},
     }

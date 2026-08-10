@@ -32,6 +32,6 @@
     "href": "index.html",
     "title": "hexmap Demos & Gallery",
     "section": "",
-    "text": "Welcome to the hexmap demonstration gallery!\n\n\n\n ::: {.card-body} ### hexmapApp (Hexagonal Watershed Explorer) Interactive Leaflet discovery of USGS subwatersheds, geographic feature restriction (Isle Royale), and hexagonal substrate grid overlays.\n\n\n\n:::"
+    "text": "Welcome to the hexmap demonstration gallery!\n\n\n\n\n\nhexmapApp (Hexagonal Watershed Explorer)\nInteractive Leaflet discovery of USGS subwatersheds, geographic feature restriction (Isle Royale), and hexagonal substrate grid overlays."
   }
 ]
