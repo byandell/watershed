@@ -12,7 +12,7 @@ Welcome to the **hexmap** demonstration gallery!
 ![](images/hexmap.png){.card-img-top style="height: 200px; object-fit: cover;"}
 
 ::: {.card-body}
-### [hexmapApp (Hexagonal Watershed Explorer)](hexmapApp.qmd)
+### [hexmapApp (Hexagonal Watershed Explorer)](hexmapApp.qmd){.stretched-link}
 
 Interactive Leaflet discovery of USGS subwatersheds, geographic feature restriction (Isle Royale), and hexagonal substrate grid overlays.
 :::
