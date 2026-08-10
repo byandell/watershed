@@ -12,20 +12,16 @@ hexmapInput <- function(id) {
   shiny::tagList(
     shiny::h4("Hexagonal Watershed Controls"),
     shiny::p(shiny::HTML("Search or outline a region on the Leaflet map, configure grid options, and generate hex topology.")),
-    shiny::checkboxInput(ns("enable_hex"), "Include Hexagonal Grid Overlay", value = TRUE),
     shiny::sliderInput(ns("max_hucs"), "Watersheds:",
       min = 3, max = 15, value = 6, step = 1
     ),
-    shiny::sliderInput(ns("n_hex_idx"), "Hexagons:",
-      min = 1, max = 7, value = 4, step = 1, ticks = TRUE
-    ),
-    shiny::uiOutput(ns("n_hex_display")),
     shiny::checkboxInput(ns("show_habitat"), "Overlay Habitat Features & Landmarks", value = TRUE),
     shiny::uiOutput(ns("feature_selector")),
+    shiny::HTML("<hr style='margin: 10px 0;'/>"),
+    shiny::checkboxInput(ns("enable_hex"), "Include Hexagonal Grid Overlay", value = TRUE),
+    hex_size_slider(ns("n_hexagons"), label = "Hexagons:", selected = 100),
     shiny::actionButton(ns("update"), "Generate Hex Topology", class = "btn-primary", style = "width: 100%; margin-top: 5px;"),
     shiny::downloadButton(ns("download_hexmap"), "Download Hexmap Topology (.rds)", class = "btn-secondary", style = "width: 100%; margin-top: 6px;"),
-    shiny::br(),
-    shiny::uiOutput(ns("status")),
     shiny::HTML("<hr style='margin: 15px 0;'/>"),
     shiny::h5("Selected Watersheds (HUCs)"),
     shiny::uiOutput(ns("huc_selector"))
@@ -81,16 +77,7 @@ hexmapServer <- function(id) {
     # Module Composition: Delegate map discovery to leafletServer module with dynamic max_hucs granularity
     leaflet_mod <- leafletServer("map", max_hucs = shiny::reactive(input$max_hucs))
 
-    # Display human-readable target hexagon count text below geometric slider
-    output$n_hex_display <- shiny::renderUI({
-      idx <- input$n_hex_idx
-      if (is.null(idx) || idx < 1 || idx > 7) idx <- 4
-      val <- c(10, 20, 50, 100, 200, 500, 1000)[idx]
-      shiny::div(
-        style = "color: #555; font-size: 0.88em; font-weight: bold; margin-top: -10px; margin-bottom: 8px;",
-        paste0("Target Grid Density: ~", val, " hexagons (Geometric Scale)")
-      )
-    })
+
 
     # Render dynamic HUC selector UI (multi-select with remove_button plugin)
     output$huc_selector <- shiny::renderUI({
@@ -287,9 +274,7 @@ hexmapServer <- function(id) {
         return(res)
       }
 
-      idx <- input$n_hex_idx
-      if (is.null(idx) || idx < 1 || idx > 7) idx <- 4
-      n_target <- c(10, 20, 50, 100, 200, 500, 1000)[idx]
+      n_target <- parse_hex_size(input$n_hexagons)
 
       # Calculate bounding box area A (in deg^2) and compute matching hex_diameter for target N
       bbox <- sf::st_bbox(sf::st_transform(huc$layer, 4326))
