@@ -532,7 +532,7 @@ add_leaflet_habitat_overlay <- function(map, object) {
     map <- map |>
       leaflet::addPolygons(
         data = hex_wgs,
-        color = "#e74c3c",
+        color = "#7F8C8D",
         weight = 1,
         fillOpacity = 0,
         popup = paste0("<b>Hex ID:</b> ", hex_wgs$hex_id, 

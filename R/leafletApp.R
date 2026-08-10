@@ -332,40 +332,11 @@ leafletServer <- function(id, max_hucs = 6) {
       })
     })
     
-    # Observer for Single User Clicks (Point Reverse Geocoding)
+    # Observer for Single User Clicks (Point click reverse geocoding API calls disabled)
+    # Map taps do not trigger network calls; users outline regions using the draw toolbar or search by HUC ID
     shiny::observeEvent(input$mapper_click, {
-      click <- input$mapper_click
-      if (is.null(click)) return()
-      
-      # Ignore click if user is currently drawing or already has a drawn polygon region
-      if (isTRUE(is_drawing()) || !is.null(drawn_polygon_sf())) return()
-      
-      status_msg(paste0("<div style='color:blue;'><b>Processing:</b> Connecting to USGS at Coordinate [", 
-                        round(click$lng, 4), ", ", round(click$lat, 4), "]...</div>"))
-      
-      # Reverse-geocode the click point to its structural USGS bounds
-      shiny::withProgress(message = 'Discovering HUC Boundary...', value = 0.5, {
-        huc <- get_huc_from_point(lng = click$lng, lat = click$lat)
-        
-        if (!is.null(huc) && nrow(huc) > 0) {
-          huc_col <- if ("huc12" %in% names(huc)) "huc12" else if ("huc10" %in% names(huc)) "huc10" else if ("huc8" %in% names(huc)) "huc8" else names(huc)[1]
-          huc_id <- as.character(huc[[huc_col]][1])
-          huc_name <- if ("name" %in% names(huc)) huc$name[1] else ""
-          status_msg(paste0("<div style='color:green;'><b>Found HUC:</b> ", huc_id, " (", huc_name, ")</div>"))
-          
-          all_hucs_sf(huc)
-          included_huc_ids(huc_id)
-          render_huc_shapes(huc, huc_id)
-            
-          huc_boundary(huc)
-        } else {
-          leaflet::leafletProxy("mapper", session = session) |> leaflet::clearGroup("huc_polygons")
-          all_hucs_sf(NULL)
-          included_huc_ids(character(0))
-          huc_boundary(NULL)
-          status_msg("<div style='color:orange;'><b>Warning:</b> No USGS Watershed topology found at this location. Ensure click is within US territory.</div>")
-        }
-      })
+      # No-op: Map background taps do not trigger USGS API calls
+      return()
     })
     
     # Return reactives and setters for parent Shiny modules (module composition)

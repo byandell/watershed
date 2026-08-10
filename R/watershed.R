@@ -165,16 +165,20 @@ autoplot.watershed_hex_overlay <- function(object, ...) {
   
   p <- ggplot2::ggplot()
   
-  # Display individual component HUC boundaries if multi-HUC
+  # 1. Overlay spatial hex grid FIRST (behind HUC boundaries) in gray
+  if (!is.null(object$hex_overlay) && length(object$hex_overlay) > 0) {
+    p <- p + ggplot2::geom_sf(data = object$hex_overlay, fill = NA, color = "#7F8C8D", linewidth = 0.5)
+  }
+  
+  # 2. Display individual component HUC boundaries if multi-HUC
   if (!is.null(object$individual_hucs) && nrow(object$individual_hucs) > 1) {
     p <- p + ggplot2::geom_sf(data = object$individual_hucs, fill = NA, color = "purple", linetype = "dashed", linewidth = 0.4)
   }
   
+  # 3. Combined watershed boundary ON TOP
+  p <- p + ggplot2::geom_sf(data = object$layer, fill = NA, color = "blue", linewidth = 0.8)
+  
   p +
-    # Represents underlying restricted outline
-    ggplot2::geom_sf(data = object$layer, fill = NA, color = "blue", linewidth = 0.7) +
-    # Overlay our spatial hexagons
-    ggplot2::geom_sf(data = object$hex_overlay, fill = NA, color = "darkred", linewidth = 0.7) +
     ggplot2::theme_minimal() +
     ggplot2::ggtitle(title_txt) +
     ggplot2::labs(x = "Longitude", y = "Latitude")

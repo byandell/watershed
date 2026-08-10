@@ -194,15 +194,28 @@ get_hucs_from_polygon <- function(polygon_sf, max_hucs = 6) {
 #'
 #' @importFrom leaflet addPolygons clearShapes
 #' @importFrom sf st_transform
-add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#C0392B", bound_color = "#2980B9") {
+add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#7F8C8D", bound_color = "#2980B9") {
   if (is.null(hex_obj)) return(map)
   
   # Ensure geometries are transformed to WGS84 (EPSG 4326) for leaflet
   bound_sf <- sf::st_transform(hex_obj$layer, 4326)
-  hex_sf <- sf::st_transform(hex_obj$hex_overlay, 4326)
+  hex_sf <- if (!is.null(hex_obj$hex_overlay)) sf::st_transform(hex_obj$hex_overlay, 4326) else NULL
   
-  # Render individual component HUC12 boundaries if multi-HUC
-  if (!is.null(hex_obj$individual_hucs) && nrow(hex_obj$individual_hucs) > 1) {
+  # 1. Add hex grid overlay FIRST (behind HUC boundaries)
+  if (!is.null(hex_sf) && length(hex_sf) > 0) {
+    map <- map |>
+      leaflet::addPolygons(
+        data = hex_sf,
+        color = hex_color,
+        weight = 1,
+        fillColor = hex_color,
+        fillOpacity = 0,
+        group = "Hex Overlay"
+      )
+  }
+  
+  # 2. Render individual component HUC12 boundaries if multi-HUC
+  if (is.data.frame(hex_obj$individual_hucs) && nrow(hex_obj$individual_hucs) > 1) {
     indiv_sf <- sf::st_transform(hex_obj$individual_hucs, 4326)
     map <- map |>
       leaflet::addPolygons(
@@ -218,7 +231,7 @@ add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#C0392B", bound_c
       )
   }
   
-  # Add watershed boundary polygon (overall combined region)
+  # 3. Add watershed boundary polygon ON TOP (overall combined region)
   huc_popup <- if (length(hex_obj$huc_id) > 1) {
     paste0("<b>Combined Watershed Region (", length(hex_obj$huc_id), " HUC12s):</b><br/>",
            paste(hex_obj$huc_id, collapse = ", "))
@@ -238,19 +251,6 @@ add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#C0392B", bound_c
       group = "Watershed Boundary",
       popup = huc_popup
     )
-  
-  # Add hex grid overlay
-  if (!is.null(hex_sf) && length(hex_sf) > 0) {
-    map <- map |>
-      leaflet::addPolygons(
-        data = hex_sf,
-        color = hex_color,
-        weight = 1,
-        fillColor = hex_color,
-        fillOpacity = 0,
-        group = "Hex Overlay"
-      )
-  }
   
   return(map)
 }
