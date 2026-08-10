@@ -22,21 +22,34 @@ leafletOutput <- function(id) {
 }
 
 #' Interactive Leaflet Mapping Server Logic
-#'
 #' Server logic for interactive Leaflet discovery. Returns a list of reactives
 #' (`huc`, `status`, `click`, `drawn_polygon`) enabling Shiny module composition.
 #'
 #' @param id Module ID
+#' @param max_hucs Maximum target number of HUC regions when searching drawn polygon extent (default: 6, can be a numeric or reactive).
 #' @return A list of reactive objects: `huc` (reactiveVal holding discovered `sf` HUC polygon(s)),
 #'   `status` (reactiveVal holding HTML status message), `click` (reactive holding map click details),
 #'   and `drawn_polygon` (reactiveVal holding user drawn rubberband polygon sf).
 #' @export
 #' @importFrom leaflet renderLeaflet leafletProxy addPolygons clearShapes
 #' @importFrom sf st_sfc st_polygon st_sf
+#' @importFrom shiny is.reactive
 #' @rdname leafletApp
-leafletServer <- function(id) {
+leafletServer <- function(id, max_hucs = 6) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    
+    # Helper to resolve max_hucs parameter (numeric constant or reactive expression)
+    get_max_hucs <- function() {
+      if (shiny::is.reactive(max_hucs)) {
+        val <- max_hucs()
+        if (is.numeric(val) && length(val) > 0) val else 6
+      } else if (is.numeric(max_hucs) && length(max_hucs) > 0) {
+        max_hucs
+      } else {
+        6
+      }
+    }
     
     # Store dynamic reactive outputs
     status_msg <- shiny::reactiveVal("")
@@ -82,7 +95,7 @@ leafletServer <- function(id) {
               color = "#8E44AD",
               weight = 3,
               fillColor = "#9B59B6",
-              fillOpacity = 0.15,
+              fillOpacity = 0,
               group = "Drawn Region"
             )
         }
@@ -125,7 +138,7 @@ leafletServer <- function(id) {
           weight = 2.5,
           dashArray = "6,6",
           fillColor = "#E74C3C",
-          fillOpacity = 0.12,
+          fillOpacity = 0,
           popup = paste0("<b>", huc_type, ":</b> ", excl_ids, "<br/><b>Name:</b> ", excl_names, "<br/><i>(Excluded - click shape on map to include)</i>")
         )
       }
@@ -142,7 +155,7 @@ leafletServer <- function(id) {
           color = "#8E44AD",
           weight = 2.5,
           fillColor = "#9B59B6",
-          fillOpacity = 0.30,
+          fillOpacity = 0,
           popup = paste0("<b>", huc_type, ":</b> ", inc_ids, "<br/><b>Name:</b> ", inc_names, "<br/><i>(Included - click shape on map to exclude)</i>")
         )
       }
@@ -266,7 +279,7 @@ leafletServer <- function(id) {
       
       status_msg("<div style='color:blue;'><b>Processing:</b> Querying USGS for watersheds in region...</div>")
       shiny::withProgress(message = 'Searching Regional Watersheds...', value = 0.5, {
-        hucs <- get_hucs_from_polygon(poly)
+        hucs <- get_hucs_from_polygon(poly, max_hucs = get_max_hucs())
         
         if (!is.null(hucs) && nrow(hucs) > 0) {
           huc_col <- if ("huc12" %in% names(hucs)) "huc12" else if ("huc10" %in% names(hucs)) "huc10" else if ("huc8" %in% names(hucs)) "huc8" else names(hucs)[1]

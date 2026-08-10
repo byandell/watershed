@@ -12,7 +12,7 @@ build_base_map()
 
 get_huc_from_point(lng, lat)
 
-get_hucs_from_polygon(polygon_sf, max_hucs = 10)
+get_hucs_from_polygon(polygon_sf, max_hucs = 6)
 
 add_leaflet_hex_overlay(
   map,
@@ -28,7 +28,7 @@ add_leaflet_hex_overlay(
 
 \item{polygon_sf}{An `sf` or `sfc` polygon object representing a drawn rubberband region.}
 
-\item{max_hucs}{Maximum number of subwatersheds before scaling up to broader HUC levels (default: 10).}
+\item{max_hucs}{Maximum number of subwatersheds before scaling up to broader HUC levels (default: 6, targeting 5-7 regions).}
 
 \item{map}{A `leaflet` map object or `leafletProxy` handle.}
 
@@ -43,7 +43,7 @@ add_leaflet_hex_overlay(
 
 `get_huc_from_point`: An `sf` polygon representation of the covering HUC12.
 
-`get_hucs_from_polygon`: An `sf` data frame of overlapping HUC subwatersheds (auto-scaled to HUC12, HUC10, or HUC8).
+`get_hucs_from_polygon`: An `sf` data frame of overlapping HUC subwatersheds (auto-scaled via code-annealed prefix matching).
 
 `add_leaflet_hex_overlay`: Updated `leaflet` map object.
 }

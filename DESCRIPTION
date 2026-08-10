@@ -19,6 +19,7 @@ Imports:
 Suggests: 
     knitr,
     rmarkdown
+VignetteBuilder: knitr
 Config/roxygen2/version: 8.0.0
 URL: https://byandell.github.io/hexmap/, https://github.com/byandell/hexmap
 BugReports: https://github.com/byandell/hexmap/issues

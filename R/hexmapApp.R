@@ -15,6 +15,8 @@ hexmapInput <- function(id) {
     shiny::uiOutput(ns("huc_selector")),
     shiny::uiOutput(ns("feature_selector")),
     shiny::checkboxInput(ns("show_habitat"), "Overlay Moose Habitat Features & Landmarks", value = TRUE),
+    shiny::sliderInput(ns("max_hucs"), "Max Target HUCs (Granularity):", 
+                       min = 3, max = 15, value = 6, step = 1),
     shiny::sliderInput(ns("hex_diameter"), "Hexagon Extent Diameter (Degrees):", 
                        min = 0.001, max = 0.05, value = 0.01, step = 0.001),
     shiny::actionButton(ns("update"), "Generate Hex Topology", class = "btn-primary", style = "width: 100%;"),
@@ -72,8 +74,8 @@ hexmapServer <- function(id) {
     
     status_msg <- shiny::reactiveVal("")
     
-    # Module Composition: Delegate map discovery to leafletServer module
-    leaflet_mod <- leafletServer("map")
+    # Module Composition: Delegate map discovery to leafletServer module with dynamic max_hucs granularity
+    leaflet_mod <- leafletServer("map", max_hucs = shiny::reactive(input$max_hucs))
     
     # Render dynamic HUC selector UI (multi-select with remove_button plugin)
     output$huc_selector <- shiny::renderUI({

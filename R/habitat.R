@@ -467,7 +467,7 @@ add_habitat_hex_overlay <- function(hex_obj, habitat_sf = NULL, landmarks_sf = N
 autoplot.habitat_hex_overlay <- function(object, show_landmarks = TRUE, ...) {
   p <- ggplot2::ggplot() +
     # Underlying island boundary
-    ggplot2::geom_sf(data = object$layer, fill = "#eef4f8", color = "#2c3e50", linewidth = 0.8)
+    ggplot2::geom_sf(data = object$layer, fill = NA, color = "#2c3e50", linewidth = 0.8)
   
   # Render habitat layers if available
   if (!is.null(object$habitat_sf) && nrow(object$habitat_sf) > 0) {
@@ -534,7 +534,7 @@ add_leaflet_habitat_overlay <- function(map, object) {
         data = hex_wgs,
         color = "#e74c3c",
         weight = 1,
-        fillOpacity = 0.15,
+        fillOpacity = 0,
         popup = paste0("<b>Hex ID:</b> ", hex_wgs$hex_id, 
                        "<br/><b>Habitat Score:</b> ", hex_wgs$habitat_score,
                        "<br/><b>Habitat Types:</b> ", hex_wgs$habitat_type),

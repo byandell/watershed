@@ -42,7 +42,7 @@ build_base_map <- function() {
         color = "#8E44AD",
         weight = 3,
         fillColor = "#9B59B6",
-        fillOpacity = 0.2
+        fillOpacity = 0
       )
     ),
     rectangleOptions = leaflet.extras::drawRectangleOptions(
@@ -50,7 +50,7 @@ build_base_map <- function() {
         color = "#8E44AD",
         weight = 3,
         fillColor = "#9B59B6",
-        fillOpacity = 0.2
+        fillOpacity = 0
       )
     ),
     editOptions = leaflet.extras::editToolbarOptions(
@@ -93,15 +93,15 @@ get_huc_from_point <- function(lng, lat) {
 }
 
 #' @param polygon_sf An `sf` or `sfc` polygon object representing a drawn rubberband region.
-#' @param max_hucs Maximum number of subwatersheds before scaling up to broader HUC levels (default: 10).
+#' @param max_hucs Maximum number of subwatersheds before scaling up to broader HUC levels (default: 6, targeting 5-7 regions).
 #'
-#' @return `get_hucs_from_polygon`: An `sf` data frame of overlapping HUC subwatersheds (auto-scaled to HUC12, HUC10, or HUC8).
+#' @return `get_hucs_from_polygon`: An `sf` data frame of overlapping HUC subwatersheds (auto-scaled via code-annealed prefix matching).
 #' @export
 #' @rdname leaflet
 #'
 #' @importFrom sf st_transform st_crs st_make_valid
 #' @importFrom nhdplusTools get_huc
-get_hucs_from_polygon <- function(polygon_sf, max_hucs = 10) {
+get_hucs_from_polygon <- function(polygon_sf, max_hucs = 6) {
   if (is.null(polygon_sf)) return(NULL)
   
   res <- NULL
@@ -110,24 +110,61 @@ get_hucs_from_polygon <- function(polygon_sf, max_hucs = 10) {
     poly_4326 <- sf::st_transform(polygon_sf, 4326)
     poly_4326 <- suppressWarnings(sf::st_make_valid(poly_4326))
     
-    # Attempt fine-grained HUC12 query
-    res <- suppressWarnings(nhdplusTools::get_huc(AOI = poly_4326, type = "huc12"))
+    # 1. Initial single spatial AOI query for fine-grained HUC12 subwatersheds
+    res12 <- suppressWarnings(nhdplusTools::get_huc(AOI = poly_4326, type = "huc12"))
     
-    # Scale up to HUC10 or HUC8 if regional extent contains too many HUC12 subwatersheds
-    if (!is.null(res) && nrow(res) > max_hucs) {
-      res10 <- tryCatch(suppressWarnings(nhdplusTools::get_huc(AOI = poly_4326, type = "huc10")), error = function(e) NULL)
-      if (!is.null(res10) && nrow(res10) > 0) {
-        if (nrow(res10) <= max_hucs) {
-          res <- res10
+    if (is.null(res12) || nrow(res12) == 0) {
+      return(NULL)
+    }
+    
+    # If HUC12 polygon count is already within target max_hucs, return immediately
+    if (nrow(res12) <= max_hucs) {
+      return(res12)
+    }
+    
+    # 2. Extract HUC12 string IDs for in-memory code-annealed prefix matching
+    huc_col <- if ("huc12" %in% names(res12)) "huc12" else names(res12)[1]
+    huc12_ids <- unname(as.character(res12[[huc_col]]))
+    
+    # Check HUC levels in hierarchical sequence (HUC10 -> HUC8 -> HUC6 -> HUC4)
+    target_level <- NULL
+    target_ids <- NULL
+    
+    u10 <- unique(substr(huc12_ids, 1, 10))
+    if (length(u10) <= max_hucs) {
+      target_level <- "huc10"
+      target_ids <- u10
+    } else {
+      u8 <- unique(substr(huc12_ids, 1, 8))
+      if (length(u8) <= max_hucs) {
+        target_level <- "huc8"
+        target_ids <- u8
+      } else {
+        u6 <- unique(substr(huc12_ids, 1, 6))
+        if (length(u6) <= max_hucs) {
+          target_level <- "huc6"
+          target_ids <- u6
         } else {
-          res8 <- tryCatch(suppressWarnings(nhdplusTools::get_huc(AOI = poly_4326, type = "huc8")), error = function(e) NULL)
-          if (!is.null(res8) && nrow(res8) > 0) {
-            res <- res8
-          } else {
-            res <- res10
-          }
+          u4 <- unique(substr(huc12_ids, 1, 4))
+          target_level <- "huc4"
+          target_ids <- u4
         }
       }
+    }
+    
+    # 3. Perform a single direct ID lookup for parent level geometries (0 spatial AOI trials)
+    if (!is.null(target_level) && !is.null(target_ids)) {
+      res_parent <- tryCatch(
+        suppressWarnings(nhdplusTools::get_huc(id = target_ids, type = target_level)),
+        error = function(e) NULL
+      )
+      if (!is.null(res_parent) && nrow(res_parent) > 0) {
+        res <- res_parent
+      } else {
+        res <- res12
+      }
+    } else {
+      res <- res12
     }
   }, error = function(e) {
     warning("Failed to locate USGS HUC geometries overlapping drawn polygon: ", e$message)
@@ -164,7 +201,7 @@ add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#C0392B", bound_c
         weight = 1.5,
         dashArray = "4,4",
         fillColor = "#9B59B6",
-        fillOpacity = 0.08,
+        fillOpacity = 0,
         group = "Individual HUC12 Boundaries",
         popup = paste0("<b>HUC12:</b> ", indiv_sf$huc12, 
                        if ("name" %in% names(indiv_sf)) paste0("<br/><b>Name:</b> ", indiv_sf$name) else "")
@@ -187,7 +224,7 @@ add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#C0392B", bound_c
       color = bound_color,
       weight = 2.5,
       fillColor = "#3498DB",
-      fillOpacity = 0.15,
+      fillOpacity = 0,
       group = "Watershed Boundary",
       popup = huc_popup
     )
@@ -200,7 +237,7 @@ add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#C0392B", bound_c
         color = hex_color,
         weight = 1,
         fillColor = hex_color,
-        fillOpacity = 0.05,
+        fillOpacity = 0,
         group = "Hex Overlay"
       )
   }

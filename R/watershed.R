@@ -172,7 +172,7 @@ autoplot.watershed_hex_overlay <- function(object, ...) {
   
   p +
     # Represents underlying restricted outline
-    ggplot2::geom_sf(data = object$layer, fill = "lightblue", alpha = 0.3, color = "blue", linewidth = 0.7) +
+    ggplot2::geom_sf(data = object$layer, fill = NA, color = "blue", linewidth = 0.7) +
     # Overlay our spatial hexagons
     ggplot2::geom_sf(data = object$hex_overlay, fill = NA, color = "darkred", linewidth = 0.7) +
     ggplot2::theme_minimal() +
