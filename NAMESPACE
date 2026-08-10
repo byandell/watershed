@@ -2,6 +2,7 @@
 
 S3method(ggplot2::autoplot,habitat_hex_overlay)
 S3method(ggplot2::autoplot,watershed_hex_overlay)
+export(add_draw_toolbar)
 export(add_habitat_hex_overlay)
 export(add_leaflet_habitat_overlay)
 export(add_leaflet_hex_overlay)

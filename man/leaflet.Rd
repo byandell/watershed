@@ -3,12 +3,15 @@
 \name{leaflet}
 \alias{leaflet}
 \alias{build_base_map}
+\alias{add_draw_toolbar}
 \alias{get_huc_from_point}
 \alias{get_hucs_from_polygon}
 \alias{add_leaflet_hex_overlay}
 \title{Interactive Leaflet Geographic Utilities}
 \usage{
 build_base_map()
+
+add_draw_toolbar(map)
 
 get_huc_from_point(lng, lat)
 
@@ -22,6 +25,8 @@ add_leaflet_hex_overlay(
 )
 }
 \arguments{
+\item{map}{A `leaflet` map object or `leafletProxy` handle.}
+
 \item{lng}{Numeric longitude coordinate}
 
 \item{lat}{Numeric latitude coordinate}
@@ -29,8 +34,6 @@ add_leaflet_hex_overlay(
 \item{polygon_sf}{An `sf` or `sfc` polygon object representing a drawn rubberband region.}
 
 \item{max_hucs}{Maximum number of subwatersheds before scaling up to broader HUC levels (default: 6, targeting 5-7 regions).}
-
-\item{map}{A `leaflet` map object or `leafletProxy` handle.}
 
 \item{hex_obj}{A `watershed_hex_overlay` S3 object (or a list containing `layer` and `hex_overlay` sf objects).}
 
@@ -40,6 +43,8 @@ add_leaflet_hex_overlay(
 }
 \value{
 `build_base_map`: A `leaflet` HTML widget object.
+
+A Leaflet map object with draw toolbar attached.
 
 `get_huc_from_point`: An `sf` polygon representation of the covering HUC12.
 

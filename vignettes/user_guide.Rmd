@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 The **`hexmap`** R package provides interactive discovery of USGS Hydrologic Unit Code (HUC) subwatershed boundaries, dynamic feature isolation (such as island landmasses via OpenStreetMap), and spatial projection of hexagonal substrate grid networks.
 
 This User Guide explains:
-1. Interactive map exploration and regional search.
+1. Interactive map exploration and regional search (Polygon, Rectangle, and Pin Marker tools).
 2. HUC subwatershed granularity auto-scaling and controls.
 3. Hexagonal substrate mesh construction, geometric scale selection, and habitat suitability scoring.
 4. The structure and usage of the consolidated single-object **Hexmap Topology (.rds)** download.
@@ -33,10 +33,11 @@ The `hexmap` package provides two interactive Shiny applications:
 
 ### Discovering Subwatersheds
 
-1. **Rubberband Polygon Draw Tool:** Use the polygon draw tool (top left of Leaflet map) to outline an arbitrary regional boundary. Click **Search Watersheds in Region** to query overlapping subwatersheds.
-2. **Map Selection Toggling:** Click any subwatershed shape directly on the map to toggle inclusion (purple outline) or exclusion (dashed red outline) in-memory without making network API calls.
-3. **No Unintentional Tapping Calls:** Tapping the map background does not generate network API calls, preventing unexpected latency while panning or zooming.
-4. **Clearing Regions:** Click **Clear Region** or hit the polygon tool again to reset the map and start a fresh search.
+1. **Rubberband Polygon & Rectangle Tools:** Use the polygon or rectangle draw tool (top left of Leaflet map) to outline an arbitrary regional boundary. Click **Search Watersheds in Region** to query overlapping subwatersheds.
+2. **Single-Click Pin Marker Tool:** Click the Marker (pin) tool on the Leaflet draw toolbar to drop a pin marker. Click **Search Watersheds in Region** to query the encompassing USGS HUC subwatershed for that exact point.
+3. **Map Selection Toggling:** Click any subwatershed shape directly on the map to toggle inclusion (purple outline) or exclusion (dashed red outline) in-memory without making network API calls.
+4. **No Unintentional Tapping Calls:** Tapping the map background does not generate network API calls, preventing unexpected latency while panning or zooming.
+5. **Clearing Regions:** Click **Clear Region** or hit the draw tool again to reset the map and start a fresh search.
 
 ---
 

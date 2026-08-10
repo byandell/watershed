@@ -2,7 +2,7 @@ leafletInput <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
     shiny::h4("Interactive Map Explorer"),
-    shiny::p("Search for a landmark, click a point on the map, or use the draw toolbar (top left) to outline a rubberband region."),
+    shiny::p("Search for a landmark, drop a point marker, or use the draw toolbar (top left) to outline a region."),
     leaflet::leafletOutput(ns("mapper"), height = "500px"),
     shiny::br(),
     shiny::uiOutput(ns("region_controls")),
@@ -38,7 +38,7 @@ leafletOutput <- function(id) {
 leafletServer <- function(id, max_hucs = 6) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    
+
     # Helper to resolve max_hucs parameter (numeric constant or reactive expression)
     get_max_hucs <- function() {
       if (shiny::is.reactive(max_hucs)) {
@@ -50,7 +50,7 @@ leafletServer <- function(id, max_hucs = 6) {
         6
       }
     }
-    
+
     # Store dynamic reactive outputs
     status_msg <- shiny::reactiveVal("")
     huc_boundary <- shiny::reactiveVal(NULL)
@@ -58,11 +58,11 @@ leafletServer <- function(id, max_hucs = 6) {
     included_huc_ids <- shiny::reactiveVal(character(0))
     drawn_polygon_sf <- shiny::reactiveVal(NULL)
     is_drawing <- shiny::reactiveVal(FALSE)
-    
+
     output$huc_status <- shiny::renderUI({
       shiny::HTML(status_msg())
     })
-    
+
     output$region_controls <- shiny::renderUI({
       poly <- drawn_polygon_sf()
       if (!is.null(poly)) {
@@ -79,61 +79,87 @@ leafletServer <- function(id, max_hucs = 6) {
         NULL
       }
     })
-    
+
     # Observer for Hide Drawn Region checkbox
-    shiny::observeEvent(input$hide_rubberband, {
-      proxy <- leaflet::leafletProxy("mapper", session = session)
-      if (isTRUE(input$hide_rubberband)) {
-        proxy |> leaflet::clearGroup("Drawn Region") |> leaflet::hideGroup("Drawn Region")
-      } else {
-        poly <- drawn_polygon_sf()
-        if (!is.null(poly)) {
+    shiny::observeEvent(input$hide_rubberband,
+      {
+        proxy <- leaflet::leafletProxy("mapper", session = session)
+        if (isTRUE(input$hide_rubberband)) {
           proxy |>
-            leaflet::showGroup("Drawn Region") |>
-            leaflet::addPolygons(
-              data = sf::st_transform(poly, 4326),
-              color = "#8E44AD",
-              weight = 3,
-              fillColor = "#9B59B6",
-              fillOpacity = 0,
-              group = "Drawn Region"
-            )
+            leaflet::clearGroup("Drawn Region") |>
+            leaflet::hideGroup("Drawn Region")
+        } else {
+          poly <- drawn_polygon_sf()
+          if (!is.null(poly)) {
+            poly_4326 <- sf::st_transform(poly, 4326)
+            is_point <- inherits(sf::st_geometry(poly_4326), "sfc_POINT")
+            proxy <- proxy |> leaflet::showGroup("Drawn Region")
+            if (is_point) {
+              proxy |> leaflet::addCircleMarkers(
+                data = poly_4326,
+                color = "#000000",
+                weight = 1.5,
+                radius = 3.5,
+                fillColor = "#FFFFFF",
+                fillOpacity = 0.9,
+                group = "Drawn Region"
+              )
+            } else {
+              proxy |> leaflet::addPolygons(
+                data = poly_4326,
+                color = "#000000",
+                weight = 1.5,
+                fillColor = "#333333",
+                fillOpacity = 0,
+                group = "Drawn Region"
+              )
+            }
+          }
         }
-      }
-    }, ignoreInit = FALSE)
-    
+      },
+      ignoreInit = FALSE
+    )
+
     # Helper to resolve HUC ID column name across all HUC levels
     get_huc_col <- function(df) {
       cols <- names(df)
       for (c in c("huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
-        if (c %in% cols) return(c)
+        if (c %in% cols) {
+          return(c)
+        }
       }
       return(cols[1])
     }
-    
+
     # Helper function to render HUC polygon shapes with styled included/excluded layers
     render_huc_shapes <- function(hucs, selected_ids) {
       proxy <- leaflet::leafletProxy("mapper", session = session)
-      
+
       if (is.null(hucs) || nrow(hucs) == 0) {
         proxy |> leaflet::clearGroup("huc_polygons")
         return()
       }
-      
+
+      is_poly <- any(c("POLYGON", "MULTIPOLYGON") %in% as.character(sf::st_geometry_type(hucs)))
+      if (!is_poly) {
+        proxy |> leaflet::clearGroup("huc_polygons")
+        return()
+      }
+
       huc_col <- get_huc_col(hucs)
       huc_type <- toupper(huc_col)
-      
+
       hucs_4326 <- sf::st_transform(hucs, 4326)
       ids <- unname(as.character(hucs_4326[[huc_col]]))
       selected_ids <- unname(as.character(selected_ids))
       names_vec <- if ("name" %in% names(hucs_4326)) hucs_4326$name else rep("", length(ids))
-      
+
       # Explicitly remove shapes by layerId and clear group to ensure Leaflet JS re-renders updated polygon styles
       proxy |> leaflet::removeShape(layerId = ids)
       proxy |> leaflet::clearGroup("huc_polygons")
-      
+
       inc_mask <- ids %in% selected_ids
-      
+
       # De-selected (excluded) watersheds: bold, high-contrast dashed crimson outline
       if (any(!inc_mask)) {
         excl_sf <- hucs_4326[!inc_mask, ]
@@ -151,7 +177,7 @@ leafletServer <- function(id, max_hucs = 6) {
           popup = paste0("<b>", huc_type, ":</b> ", excl_ids, "<br/><b>Name:</b> ", excl_names, "<br/><i>(Excluded - click shape on map to include)</i>")
         )
       }
-      
+
       # Selected (included) watersheds: solid vibrant purple outline
       if (any(inc_mask)) {
         inc_sf <- hucs_4326[inc_mask, ]
@@ -169,55 +195,63 @@ leafletServer <- function(id, max_hucs = 6) {
         )
       }
     }
-    
+
     # Helper function to update included IDs, re-render shapes, and update huc_boundary
     update_included_ids <- function(new_inc) {
       all_hucs <- all_hucs_sf()
-      if (is.null(all_hucs) || nrow(all_hucs) == 0) return()
-      
+      if (is.null(all_hucs) || nrow(all_hucs) == 0) {
+        return()
+      }
+
       huc_col <- get_huc_col(all_hucs)
       valid_ids <- unname(as.character(all_hucs[[huc_col]]))
-      
+
       new_inc <- intersect(unname(as.character(new_inc)), valid_ids)
       included_huc_ids(new_inc)
       render_huc_shapes(all_hucs, new_inc)
-      
+
       filtered_sf <- all_hucs[valid_ids %in% new_inc, ]
       huc_boundary(if (nrow(filtered_sf) > 0) filtered_sf else NULL)
-      
+
       n_inc <- length(new_inc)
       n_total <- length(valid_ids)
       status_msg(paste0("<div style='color:purple;'><b>Updated Selection:</b> ", n_inc, " of ", n_total, " watersheds included.</div>"))
     }
-    
+
     # Observer for Shape Clicks (Toggle HUC inclusion/exclusion in-memory)
     shiny::observeEvent(input$mapper_shape_click, {
       click_shape <- input$mapper_shape_click
-      if (is.null(click_shape) || is.null(click_shape$id)) return()
-      
+      if (is.null(click_shape) || is.null(click_shape$id)) {
+        return()
+      }
+
       clicked_id <- unname(as.character(click_shape$id))
       all_hucs <- all_hucs_sf()
-      if (is.null(all_hucs) || nrow(all_hucs) == 0) return()
-      
+      if (is.null(all_hucs) || nrow(all_hucs) == 0) {
+        return()
+      }
+
       huc_col <- get_huc_col(all_hucs)
       valid_ids <- unname(as.character(all_hucs[[huc_col]]))
-      if (!clicked_id %in% valid_ids) return()
-      
+      if (!clicked_id %in% valid_ids) {
+        return()
+      }
+
       current_inc <- unname(as.character(included_huc_ids()))
       new_inc <- if (clicked_id %in% current_inc) {
         setdiff(current_inc, clicked_id)
       } else {
         union(current_inc, clicked_id)
       }
-      
+
       update_included_ids(new_inc)
     })
-    
+
     # Render the initial basemap (Option A: Search and Draw toolbar included)
     output$mapper <- leaflet::renderLeaflet({
       build_base_map()
     })
-    
+
     # Track drawing state and clear previous shapes when user hits polygon draw tool again
     shiny::observeEvent(input$mapper_draw_start, {
       is_drawing(TRUE)
@@ -228,39 +262,71 @@ leafletServer <- function(id, max_hucs = 6) {
       leaflet::leafletProxy("mapper", session = session) |>
         leaflet::clearGroup("Drawn Region") |>
         leaflet::clearGroup("huc_polygons") |>
-        leaflet::clearShapes()
+        leaflet::clearGroup("Hex Overlay") |>
+        leaflet::clearGroup("Habitat Substrate Mesh") |>
+        leaflet::clearShapes() |>
+        leaflet::clearMarkers()
     })
-    
+
     shiny::observeEvent(input$mapper_draw_stop, {
       is_drawing(FALSE)
     })
-    
-    # Parse GeoJSON drawn feature into sf polygon
+
+    # Parse GeoJSON drawn feature into sf polygon, circle/oval polygon, or point marker
     parse_drawn_feature <- function(feature) {
-      if (is.null(feature) || is.null(feature$geometry) || is.null(feature$geometry$coordinates)) return(NULL)
-      coords_raw <- feature$geometry$coordinates[[1]]
-      if (is.null(coords_raw) || length(coords_raw) < 3) return(NULL)
-      
-      mat <- do.call(rbind, lapply(coords_raw, function(pt) c(as.numeric(pt[[1]]), as.numeric(pt[[2]]))))
+      if (is.null(feature) || is.null(feature$geometry) || is.null(feature$geometry$coordinates)) {
+        return(NULL)
+      }
+
+      type <- feature$geometry$type
+      layer_type <- feature$properties$layerType
+      coords_raw <- feature$geometry$coordinates
+
+      # 1. Pin Marker Tool
+      if (identical(type, "Point") || identical(layer_type, "marker")) {
+        lng <- as.numeric(coords_raw[[1]])
+        lat <- as.numeric(coords_raw[[2]])
+        pt <- sf::st_sfc(sf::st_point(c(lng, lat)), crs = 4326)
+        return(sf::st_sf(geometry = pt))
+      }
+
+      # 2. Rectangle Tool & Polygon Tool -> Retains exact drawn Rectangle / Polygon
+      coords_poly <- coords_raw[[1]]
+      if (is.null(coords_poly) || length(coords_poly) < 3) {
+        return(NULL)
+      }
+
+      mat <- do.call(rbind, lapply(coords_poly, function(pt) c(as.numeric(pt[[1]]), as.numeric(pt[[2]]))))
       poly <- sf::st_sfc(sf::st_polygon(list(mat)), crs = 4326)
-      sf::st_sf(geometry = poly)
+      return(sf::st_sf(geometry = poly))
     }
-    
-    # Observer for Drawn Features (Rubberband polygon)
+
+    # Observer for Drawn Features (Rubberband polygon, Circle, Rectangle, or Point marker)
     shiny::observeEvent(input$mapper_draw_new_feature, {
       is_drawing(FALSE)
-      leaflet::leafletProxy("mapper", session = session) |>
-        leaflet::clearGroup("Drawn Region") |>
-        leaflet::clearGroup("huc_polygons")
       
       feature <- input$mapper_draw_new_feature
       poly_sf <- parse_drawn_feature(feature)
+      
+      proxy <- leaflet::leafletProxy("mapper", session = session)
+      proxy |>
+        leaflet::clearGroup("huc_polygons") |>
+        leaflet::clearGroup("Hex Overlay") |>
+        leaflet::clearGroup("Habitat Substrate Mesh")
+      
       if (!is.null(poly_sf)) {
         drawn_polygon_sf(poly_sf)
-        status_msg("<div style='color:purple;'><b>Rubberband Region Outlined:</b> Play with boundary on map if desired, then click <b>'Search Watersheds in Region'</b>.</div>")
+        is_point <- inherits(sf::st_geometry(poly_sf), "sfc_POINT")
+        
+        msg <- if (is_point) {
+          "<div style='color:purple;'><b>Point Selected:</b> Click <b>'Search Watersheds in Region'</b> to discover overlapping watershed.</div>"
+        } else {
+          "<div style='color:purple;'><b>Regional Boundary Outlined:</b> Adjust boundary on map if desired, then click <b>'Search Watersheds in Region'</b>.</div>"
+        }
+        status_msg(msg)
       }
     })
-    
+
     shiny::observeEvent(input$mapper_draw_edited_features, {
       is_drawing(FALSE)
       features <- input$mapper_draw_edited_features$features
@@ -272,7 +338,7 @@ leafletServer <- function(id, max_hucs = 6) {
         }
       }
     })
-    
+
     shiny::observeEvent(input$mapper_draw_deleted_features, {
       is_drawing(FALSE)
       drawn_polygon_sf(NULL)
@@ -282,10 +348,15 @@ leafletServer <- function(id, max_hucs = 6) {
       leaflet::leafletProxy("mapper", session = session) |>
         leaflet::clearGroup("Drawn Region") |>
         leaflet::clearGroup("huc_polygons") |>
-        leaflet::clearShapes()
+        leaflet::clearGroup("Hex Overlay") |>
+        leaflet::clearGroup("Habitat Substrate Mesh") |>
+        leaflet::clearShapes() |>
+        leaflet::clearMarkers() |>
+        leaflet.extras::removeDrawToolbar(clearFeatures = TRUE) |>
+        add_draw_toolbar()
       status_msg("<div style='color:gray;'>Drawn region cleared.</div>")
     })
-    
+
     shiny::observeEvent(input$clear_region, {
       is_drawing(FALSE)
       drawn_polygon_sf(NULL)
@@ -295,34 +366,41 @@ leafletServer <- function(id, max_hucs = 6) {
       leaflet::leafletProxy("mapper", session = session) |>
         leaflet::clearGroup("Drawn Region") |>
         leaflet::clearGroup("huc_polygons") |>
-        leaflet::clearShapes()
+        leaflet::clearGroup("Hex Overlay") |>
+        leaflet::clearGroup("Habitat Substrate Mesh") |>
+        leaflet::clearShapes() |>
+        leaflet::clearMarkers() |>
+        leaflet.extras::removeDrawToolbar(clearFeatures = TRUE) |>
+        add_draw_toolbar()
       status_msg("<div style='color:gray;'>Drawn region cleared.</div>")
     })
-    
+
     # Trigger watershed discovery for drawn rubberband polygon region
     shiny::observeEvent(input$search_region, {
       poly <- drawn_polygon_sf()
-      if (is.null(poly)) return()
-      
+      if (is.null(poly)) {
+        return()
+      }
+
       status_msg("<div style='color:blue;'><b>Processing:</b> Querying USGS for watersheds in region...</div>")
-      shiny::withProgress(message = 'Searching Regional Watersheds...', value = 0.5, {
+      shiny::withProgress(message = "Searching Regional Watersheds...", value = 0.5, {
         hucs <- get_hucs_from_polygon(poly, max_hucs = get_max_hucs())
-        
+
         if (!is.null(hucs) && nrow(hucs) > 0) {
           huc_col <- get_huc_col(hucs)
           huc_type <- toupper(huc_col)
           huc_ids <- as.character(hucs[[huc_col]])
           huc_names <- if ("name" %in% names(hucs)) hucs$name else rep("", length(huc_ids))
           n_hucs <- length(huc_ids)
-          
+
           # Cache all fetched HUC geometries and initialize all as included
           all_hucs_sf(hucs)
           included_huc_ids(huc_ids)
           render_huc_shapes(hucs, huc_ids)
-          
+
           huc_str <- paste(paste0(huc_ids, " (", huc_names, ")"), collapse = ", ")
           status_msg(paste0("<div style='color:green;'><b>Identified ", n_hucs, " ", huc_type, " Watersheds in Region:</b><br/>", huc_str, "<br/><i>Click any polygon on map to toggle inclusion/exclusion.</i></div>"))
-          
+
           huc_boundary(hucs)
         } else {
           all_hucs_sf(NULL)
@@ -331,14 +409,14 @@ leafletServer <- function(id, max_hucs = 6) {
         }
       })
     })
-    
+
     # Observer for Single User Clicks (Point click reverse geocoding API calls disabled)
     # Map taps do not trigger network calls; users outline regions using the draw toolbar or search by HUC ID
     shiny::observeEvent(input$mapper_click, {
       # No-op: Map background taps do not trigger USGS API calls
       return()
     })
-    
+
     # Return reactives and setters for parent Shiny modules (module composition)
     return(list(
       huc = huc_boundary,

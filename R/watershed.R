@@ -21,7 +21,14 @@ get_watershed <- function(huc_id, feature_name = NULL, huc_layer = NULL) {
     huc_id <- trimws(unlist(strsplit(huc_id, ",")))
   }
   
-  # Get HUC12 sf object (queries USGS WBD if layer not provided)
+  # Get HUC12 sf object (queries USGS WBD if layer not provided or if layer is not a polygon geometry)
+  if (!is.null(huc_layer)) {
+    geom_types <- as.character(sf::st_geometry_type(huc_layer))
+    if (!any(c("POLYGON", "MULTIPOLYGON") %in% geom_types)) {
+      huc_layer <- NULL
+    }
+  }
+  
   if (is.null(huc_layer)) {
     huc_layer <- suppressWarnings(nhdplusTools::get_huc(id = huc_id, type = "huc12"))
   }
@@ -63,18 +70,26 @@ get_watershed <- function(huc_id, feature_name = NULL, huc_layer = NULL) {
       } 
       
       if (!is.null(feature_sf)) {
-        # Project to HUC's CRS and spatially intersect to restrict bounds
-        feature_sf <- sf::st_transform(feature_sf, sf::st_crs(huc_layer))
-        clipped_layer <- suppressWarnings(sf::st_intersection(huc_layer, feature_sf))
-        
-        # If intersection yields valid geometries, use it; otherwise fallback to full HUC
-        if (nrow(clipped_layer) > 0) {
-           huc_layer <- clipped_layer
+        geom_types <- as.character(sf::st_geometry_type(feature_sf))
+        if (any(c("POLYGON", "MULTIPOLYGON") %in% geom_types)) {
+          # Project to HUC's CRS and spatially intersect to restrict bounds
+          feature_sf <- sf::st_transform(feature_sf, sf::st_crs(huc_layer))
+          clipped_layer <- suppressWarnings(sf::st_intersection(huc_layer, feature_sf))
+          
+          # If intersection yields valid polygon geometries, use it; otherwise fallback to full HUC
+          if (!is.null(clipped_layer) && nrow(clipped_layer) > 0) {
+            clipped_types <- as.character(sf::st_geometry_type(clipped_layer))
+            if (any(c("POLYGON", "MULTIPOLYGON") %in% clipped_types)) {
+              huc_layer <- clipped_layer
+            } else {
+              warning(paste("Feature", feature_name, "does not yield a polygon intersection - Generating whole HUC region instead."))
+            }
+          } else {
+            warning(paste("Feature", feature_name, "does not overlap with specified HUC region - Generating whole HUC region instead."))
+          }
         } else {
-           warning(paste("Feature", feature_name, "does not overlap with specified HUC region - Generating whole HUC region instead."))
+          warning(paste("osmdata could not extract a valid polygon for feature:", feature_name, "- Generating whole HUC region instead."))
         }
-      } else {
-        warning(paste("osmdata could not extract a valid polygon for feature:", feature_name, "- Generating whole HUC region instead."))
       }
     }
   }

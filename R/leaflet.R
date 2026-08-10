@@ -29,27 +29,43 @@ build_base_map <- function() {
     )
   )
   
-  # Embed Leaflet draw toolbar for user-selected rubberband polygon region outlines
-  map <- leaflet.extras::addDrawToolbar(
+  # Embed Leaflet draw toolbar for user-selected rubberband polygon or point region outlines
+  map <- add_draw_toolbar(map)
+  
+  # Default view point (Center of US)
+  map <- leaflet::setView(map, lng = -98.5795, lat = 39.8283, zoom = 4)
+  
+  return(map)
+}
+
+#' Add standard draw toolbar controls to a Leaflet map object
+#'
+#' @param map A Leaflet map object.
+#' @return A Leaflet map object with draw toolbar attached.
+#' @export
+#' @rdname leaflet
+add_draw_toolbar <- function(map) {
+  leaflet.extras::addDrawToolbar(
     map,
     targetGroup = "Drawn Region",
+    singleFeature = TRUE,
     polylineOptions = FALSE,
     circleOptions = FALSE,
-    markerOptions = FALSE,
     circleMarkerOptions = FALSE,
+    markerOptions = leaflet.extras::drawMarkerOptions(),
     polygonOptions = leaflet.extras::drawPolygonOptions(
       shapeOptions = leaflet.extras::drawShapeOptions(
-        color = "#8E44AD",
-        weight = 3,
-        fillColor = "#9B59B6",
+        color = "#000000",
+        weight = 1.5,
+        fillColor = "#333333",
         fillOpacity = 0
       )
     ),
     rectangleOptions = leaflet.extras::drawRectangleOptions(
       shapeOptions = leaflet.extras::drawShapeOptions(
-        color = "#8E44AD",
-        weight = 3,
-        fillColor = "#9B59B6",
+        color = "#000000",
+        weight = 1.5,
+        fillColor = "#333333",
         fillOpacity = 0
       )
     ),
@@ -57,11 +73,6 @@ build_base_map <- function() {
       selectedPathOptions = leaflet.extras::selectedPathOptions()
     )
   )
-  
-  # Default view point (Center of US)
-  map <- leaflet::setView(map, lng = -98.5795, lat = 39.8283, zoom = 4)
-  
-  return(map)
 }
 
 #' @param lng Numeric longitude coordinate
@@ -198,59 +209,65 @@ add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#7F8C8D", bound_c
   if (is.null(hex_obj)) return(map)
   
   # Ensure geometries are transformed to WGS84 (EPSG 4326) for leaflet
-  bound_sf <- sf::st_transform(hex_obj$layer, 4326)
+  bound_sf <- if (!is.null(hex_obj$layer)) sf::st_transform(hex_obj$layer, 4326) else NULL
   hex_sf <- if (!is.null(hex_obj$hex_overlay)) sf::st_transform(hex_obj$hex_overlay, 4326) else NULL
   
   # 1. Add hex grid overlay FIRST (behind HUC boundaries)
   if (!is.null(hex_sf) && length(hex_sf) > 0) {
-    map <- map |>
-      leaflet::addPolygons(
-        data = hex_sf,
-        color = hex_color,
-        weight = 1,
-        fillColor = hex_color,
-        fillOpacity = 0,
-        group = "Hex Overlay"
-      )
+    if (any(c("POLYGON", "MULTIPOLYGON") %in% as.character(sf::st_geometry_type(hex_sf)))) {
+      map <- map |>
+        leaflet::addPolygons(
+          data = hex_sf,
+          color = hex_color,
+          weight = 1,
+          fillColor = hex_color,
+          fillOpacity = 0,
+          group = "Hex Overlay"
+        )
+    }
   }
   
   # 2. Render individual component HUC12 boundaries if multi-HUC
   if (is.data.frame(hex_obj$individual_hucs) && nrow(hex_obj$individual_hucs) > 1) {
     indiv_sf <- sf::st_transform(hex_obj$individual_hucs, 4326)
-    map <- map |>
-      leaflet::addPolygons(
-        data = indiv_sf,
-        color = "#8E44AD",
-        weight = 1.5,
-        dashArray = "4,4",
-        fillColor = "#9B59B6",
-        fillOpacity = 0,
-        group = "Individual HUC12 Boundaries",
-        popup = paste0("<b>HUC12:</b> ", indiv_sf$huc12, 
-                       if ("name" %in% names(indiv_sf)) paste0("<br/><b>Name:</b> ", indiv_sf$name) else "")
-      )
+    if (any(c("POLYGON", "MULTIPOLYGON") %in% as.character(sf::st_geometry_type(indiv_sf)))) {
+      map <- map |>
+        leaflet::addPolygons(
+          data = indiv_sf,
+          color = "#8E44AD",
+          weight = 1.5,
+          dashArray = "4,4",
+          fillColor = "#9B59B6",
+          fillOpacity = 0,
+          group = "Individual HUC12 Boundaries",
+          popup = paste0("<b>HUC12:</b> ", indiv_sf$huc12, 
+                         if ("name" %in% names(indiv_sf)) paste0("<br/><b>Name:</b> ", indiv_sf$name) else "")
+        )
+    }
   }
   
   # 3. Add watershed boundary polygon ON TOP (overall combined region)
-  huc_popup <- if (length(hex_obj$huc_id) > 1) {
-    paste0("<b>Combined Watershed Region (", length(hex_obj$huc_id), " HUC12s):</b><br/>",
-           paste(hex_obj$huc_id, collapse = ", "))
-  } else {
-    paste0("<b>HUC12:</b> ", hex_obj$huc_id, 
-           if (!is.null(hex_obj$feature_name) && hex_obj$feature_name != "") 
-             paste0("<br/><b>Feature:</b> ", hex_obj$feature_name) else "")
+  if (!is.null(bound_sf) && any(c("POLYGON", "MULTIPOLYGON") %in% as.character(sf::st_geometry_type(bound_sf)))) {
+    huc_popup <- if (length(hex_obj$huc_id) > 1) {
+      paste0("<b>Combined Watershed Region (", length(hex_obj$huc_id), " HUC12s):</b><br/>",
+             paste(hex_obj$huc_id, collapse = ", "))
+    } else {
+      paste0("<b>HUC12:</b> ", hex_obj$huc_id, 
+             if (!is.null(hex_obj$feature_name) && hex_obj$feature_name != "") 
+               paste0("<br/><b>Feature:</b> ", hex_obj$feature_name) else "")
+    }
+    
+    map <- map |>
+      leaflet::addPolygons(
+        data = bound_sf,
+        color = bound_color,
+        weight = 2.5,
+        fillColor = "#3498DB",
+        fillOpacity = 0,
+        group = "Watershed Boundary",
+        popup = huc_popup
+      )
   }
-  
-  map <- map |>
-    leaflet::addPolygons(
-      data = bound_sf,
-      color = bound_color,
-      weight = 2.5,
-      fillColor = "#3498DB",
-      fillOpacity = 0,
-      group = "Watershed Boundary",
-      popup = huc_popup
-    )
   
   return(map)
 }
