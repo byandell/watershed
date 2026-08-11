@@ -203,8 +203,8 @@ leafletServer <- function(id, huc_level = 8, max_hucs = 6) {
           layerId = inc_ids,
           group = "huc_polygons",
           color = "#8E44AD",
-          weight = 2.5,
-          fillColor = "#9B59B6",
+          weight = 2,
+          fillColor = "#8E44AD",
           fillOpacity = 0,
           popup = paste0("<b>", huc_type, ":</b> ", inc_ids, "<br/><b>Name:</b> ", inc_names, "<br/><i>(Included - click shape on map to exclude)</i>")
         )

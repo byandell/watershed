@@ -24,7 +24,7 @@ add_leaflet_hex_overlay(
   map,
   hex_obj,
   hex_color = "#7F8C8D",
-  bound_color = "#2980B9"
+  bound_color = "#8E44AD"
 )
 }
 \arguments{

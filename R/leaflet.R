@@ -264,7 +264,7 @@ get_hucs_from_polygon <- function(polygon_sf, huc_level = 8, max_hucs = 6) {
 #'
 #' @importFrom leaflet addPolygons clearShapes
 #' @importFrom sf st_transform
-add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#7F8C8D", bound_color = "#2980B9") {
+add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#7F8C8D", bound_color = "#8E44AD") {
   if (is.null(hex_obj)) return(map)
   
   # Ensure geometries are transformed to WGS84 (EPSG 4326) for leaflet
@@ -286,20 +286,26 @@ add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#7F8C8D", bound_c
     }
   }
   
-  # 2. Render individual component HUC12 boundaries if multi-HUC
+  # 2. Render individual component HUC boundaries if multi-HUC
   if (is.data.frame(hex_obj$individual_hucs) && nrow(hex_obj$individual_hucs) > 1) {
     indiv_sf <- sf::st_transform(hex_obj$individual_hucs, 4326)
     if (any(c("POLYGON", "MULTIPOLYGON") %in% as.character(sf::st_geometry_type(indiv_sf)))) {
+      cols <- names(indiv_sf)
+      huc_col <- NULL
+      for (c in c("huc16", "huc14", "huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
+        if (c %in% cols) { huc_col <- c; break }
+      }
+      if (is.null(huc_col)) huc_col <- cols[1]
+
       map <- map |>
         leaflet::addPolygons(
           data = indiv_sf,
-          color = "#8E44AD",
-          weight = 1.5,
-          dashArray = "4,4",
-          fillColor = "#9B59B6",
+          color = bound_color,
+          weight = 2,
+          fillColor = bound_color,
           fillOpacity = 0,
-          group = "Individual HUC12 Boundaries",
-          popup = paste0("<b>HUC12:</b> ", indiv_sf$huc12, 
+          group = "Individual HUC Boundaries",
+          popup = paste0("<b>HUC:</b> ", indiv_sf[[huc_col]], 
                          if ("name" %in% names(indiv_sf)) paste0("<br/><b>Name:</b> ", indiv_sf$name) else "")
         )
     }
@@ -320,8 +326,8 @@ add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#7F8C8D", bound_c
       leaflet::addPolygons(
         data = bound_sf,
         color = bound_color,
-        weight = 2.5,
-        fillColor = "#3498DB",
+        weight = 2,
+        fillColor = bound_color,
         fillOpacity = 0,
         group = "Watershed Boundary",
         popup = huc_popup

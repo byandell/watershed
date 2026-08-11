@@ -345,7 +345,13 @@ hexmapServer <- function(id) {
       # Target the sub-module's leafletProxy handle ('map-mapper')
       map_proxy_id <- ns("map-mapper")
       proxy <- leaflet::leafletProxy(map_proxy_id) |>
-        leaflet::clearShapes() |>
+        leaflet::clearGroup("Hex Overlay") |>
+        leaflet::clearGroup("Habitat Substrate Mesh") |>
+        leaflet::clearGroup("Moose Sighting Areas") |>
+        leaflet::clearGroup("Habitat Overlay") |>
+        leaflet::clearGroup("Landmarks") |>
+        leaflet::clearGroup("Watershed Boundary") |>
+        leaflet::clearGroup("Individual HUC Boundaries") |>
         add_leaflet_hex_overlay(obj)
 
       if (inherits(obj, "habitat_hex_overlay")) {
