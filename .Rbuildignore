@@ -7,5 +7,14 @@
 ^\.Rproj\.user$
 ^Rplots\.pdf$
 ^AGENTS\.md$
+^pyproject\.toml$
+^hexmap$
+^.*\.egg-info$
+^\.venv$
+^\.pytest_cache$
+^__pycache__$
+^poetry\.lock$
+^build$
+^dist$
 
 

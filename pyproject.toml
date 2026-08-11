@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hexmap"
+version = "0.3.1"
+description = "Interactive Hexagonal Watershed Mapping and Spatial Substrate Projection in Python"
+readme = "README.md"
+authors = [
+    { name = "Brian S. Yandell", email = "brian.yandell@wisc.edu" }
+]
+license = { text = "GPL-3.0" }
+requires-python = ">=3.9"
+dependencies = [
+    "geopandas>=0.12.0",
+    "shapely>=2.0.0",
+    "pyproj>=3.0.0",
+    "requests>=2.28.0",
+    "numpy>=1.22.0",
+    "pandas>=1.5.0",
+    "shiny>=0.5.0",
+    "folium>=0.14.0",
+]
+
+[project.optional-dependencies]
+jupyter = [
+    "ipyleaflet>=0.17.0",
+    "shinywidgets>=0.2.0",
+]
+test = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+hexmap-app = "hexmap.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hexmap*"]

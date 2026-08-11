@@ -7,3 +7,9 @@ docs/
 demos/.quarto/
 demos/_extensions/
 demos/site_libs/
+.venv/
+__pycache__/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
