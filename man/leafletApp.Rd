@@ -8,12 +8,14 @@
 \usage{
 leafletOutput(id)
 
-leafletServer(id, max_hucs = 6)
+leafletServer(id, huc_level = 8, max_hucs = 6)
 
 leafletApp()
 }
 \arguments{
 \item{id}{Module ID}
+
+\item{huc_level}{Target USGS HUC digit level (2-12, default: 8, can be numeric or reactive).}
 
 \item{max_hucs}{Maximum target number of HUC regions when searching drawn polygon extent (default: 6, can be a numeric or reactive).}
 }

@@ -32,15 +32,15 @@ hexmap/
 
 ### A. Geographic Search & HUC Retrieval (`R/leaflet.R`)
 - `build_base_map()`: Initializes an interactive Leaflet basemap centered on North America with OpenStreetMap search bar and `leaflet.extras` draw toolbar.
-- `get_huc_from_point(lng, lat)`: Reverse-geocodes coordinate points into encompassing USGS HUC12 subwatersheds.
-- `get_hucs_from_polygon(polygon_sf, max_hucs = 6)`: Identifies all subwatersheds overlapping a user-drawn bounding polygon, utilizing **code-annealed string prefix matching** to auto-scale granularity.
+- `get_huc_from_point(lng, lat)`: Reverse-geocodes coordinate points into encompassing USGS HUC subwatersheds.
+- `get_hucs_from_polygon(polygon_sf, huc_level = 8, max_hucs = 6)`: Identifies all subwatersheds overlapping a user-drawn bounding polygon or marker, utilizing **area-based initial query scaling** and **code-annealed string prefix matching** to auto-scale granularity.
 
 ### B. Interactive Leaflet Shiny Module (`R/leafletApp.R`)
-- `leafletInput(id)`, `leafletOutput(id)`, `leafletServer(id, max_hucs)`: Modular Shiny components supporting rubberband region drawing, shape editing, shape clearing, and shape toggling.
+- `leafletInput(id)`, `leafletOutput(id)`, `leafletServer(id, huc_level, max_hucs)`: Modular Shiny components supporting rubberband region drawing, shape editing, shape clearing, and shape toggling.
 - Purges previous drawn shapes (`clearGroup("Drawn Region")`) and subwatershed overlays (`clearGroup("huc_polygons")`) automatically when starting new draw operations or clicking **Clear Region**.
 
 ### C. Watershed Topology & Feature Clipping (`R/watershed.R`)
-- `get_watershed(huc_id, feature_name, huc_layer)`: Fetches USGS HUC12 boundaries and applies optional spatial feature clipping (e.g. restricting boundary to an island landmass).
+- `get_watershed(huc_id, feature_name, huc_layer)`: Fetches USGS HUC boundaries (`"huc02"` through `"huc16"`) and applies optional spatial feature clipping (e.g. restricting boundary to an island landmass).
 - `add_watershed_hex_overlay(huc_info, hex_diameter)`: Generates a spatial hexagonal grid overlay (`sfc_POLYGON`) across the boundary extent.
 - S3 Class: `watershed_hex_overlay`.
 
@@ -51,7 +51,7 @@ hexmap/
 - S3 Class: `habitat_hex_overlay` (inherits from `watershed_hex_overlay`).
 
 ### E. Main Application & Unified Download (`R/hexmapApp.R`)
-- `hexmapInput(id)`, `hexmapOutput(id)`, `hexmapServer(id)`: Reorganized sidebar layout placing primary controls at top and selected HUCs at the bottom.
+- `hexmapInput(id)`, `hexmapOutput(id)`, `hexmapServer(id)`: Reorganized sidebar layout with HUC Level slider (2 to 12, step = 2).
 - Provides a single **Download Hexmap Topology (.rds)** button (`download_hexmap`) exporting the full unified S3 object.
 
 ---
@@ -75,18 +75,20 @@ Extends `watershed_hex_overlay` with ecological layers:
 
 ---
 
-## 4. Code-Annealed HUC Granularity Algorithm
+## 4. Area-Scaled Query, In-Memory Aggregation, & UI Synchronization
 
-To prevent network latency and avoid rendering 1000+ tiny HUC12 subwatersheds when a user draws a large regional bounding box, `get_hucs_from_polygon()` employs a zero-overhead string prefix matching algorithm:
+To prevent network latency and avoid rendering thousands of tiny HUC12 subwatersheds when a user draws a large regional bounding box, `get_hucs_from_polygon()` and `aggregate_hucs()` employ area-based initial query scaling, zero-API-call spatial union aggregation, and reactive UI synchronization:
 
-1. Executes **1 initial spatial AOI query** for `HUC12` subwatersheds.
-2. If $N > \text{max\_hucs}$ (default 6), inspects 12-digit HUC code prefixes in memory:
-   - `u10 <- unique(substr(huc12_ids, 1, 10))`
-   - `u08 <- unique(substr(huc12_ids, 1, 8))`
-   - `u06 <- unique(substr(huc12_ids, 1, 6))`
-   - `u04 <- unique(substr(huc12_ids, 1, 4))`
-3. Selects the finest level where count $\le \text{max\_hucs}$. If all levels exceed `max_hucs`, selects the coarsest level with the minimum count.
-4. Performs **1 direct ID lookup** `nhdplusTools::get_huc(id = target_ids, type = target_level)` using two-digit padded type names (`"huc10"`, `"huc08"`, `"huc06"`, `"huc04"`).
+1. **Area-Based Query Scaling:** Calculates polygon area ($km^2$) for polygon/rectangle regions (or defaults point markers to finest requested level):
+   - **Area > 200,000 km²:** initial query starts at `"huc04"`.
+   - **50,000 km² – 200,000 km²:** initial query starts at `"huc06"`.
+   - **10,000 km² – 50,000 km²:** initial query starts at `"huc08"`.
+   - **1,000 km² – 10,000 km²:** initial query starts at `"huc10"`.
+   - **Area ≤ 1,000 km² / Point Markers:** initial query starts at `"huc12"` or target `huc_level`.
+2. **0-API-Call In-Memory Spatial Union Aggregation (`aggregate_hucs`):** When moving the HUC Level sidebar slider from finer to broader levels (e.g. `12` $\rightarrow$ `10` $\rightarrow$ `8` $\rightarrow$ `6` $\rightarrow$ `4` $\rightarrow$ `2`), fine HUC geometries cached in memory (`raw_fetched_hucs`) are merged via `sf::st_union` by prefix matching with **0 network API calls**.
+3. **Automatic Slider & UI Synchronization:**
+   - **Slider Auto-Sync:** When a region search completes, `hexmapServer` automatically updates the sidebar slider (`shiny::updateSliderInput`) to match the safest base level determined for the region.
+   - **Clear Region Reset:** Clicking **Clear Region** or deleting drawn features resets Leaflet map shape layers and clears the sidebar multi-select dropdown (`input$huc12_id`) in sync.
 
 ---
 

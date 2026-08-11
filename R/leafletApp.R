@@ -26,6 +26,7 @@ leafletOutput <- function(id) {
 #' (`huc`, `status`, `click`, `drawn_polygon`) enabling Shiny module composition.
 #'
 #' @param id Module ID
+#' @param huc_level Target USGS HUC digit level (2-12, default: 8, can be numeric or reactive).
 #' @param max_hucs Maximum target number of HUC regions when searching drawn polygon extent (default: 6, can be a numeric or reactive).
 #' @return A list of reactive objects: `huc` (reactiveVal holding discovered `sf` HUC polygon(s)),
 #'   `status` (reactiveVal holding HTML status message), `click` (reactive holding map click details),
@@ -35,9 +36,21 @@ leafletOutput <- function(id) {
 #' @importFrom sf st_sfc st_polygon st_sf
 #' @importFrom shiny is.reactive
 #' @rdname leafletApp
-leafletServer <- function(id, max_hucs = 6) {
+leafletServer <- function(id, huc_level = 8, max_hucs = 6) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # Helper to resolve huc_level parameter (numeric constant or reactive expression)
+    get_huc_level <- function() {
+      if (shiny::is.reactive(huc_level)) {
+        val <- huc_level()
+        if (!is.null(val) && length(val) > 0) val else 8
+      } else if (!is.null(huc_level) && length(huc_level) > 0) {
+        huc_level
+      } else {
+        8
+      }
+    }
 
     # Helper to resolve max_hucs parameter (numeric constant or reactive expression)
     get_max_hucs <- function() {
@@ -54,6 +67,8 @@ leafletServer <- function(id, max_hucs = 6) {
     # Store dynamic reactive outputs
     status_msg <- shiny::reactiveVal("")
     huc_boundary <- shiny::reactiveVal(NULL)
+    raw_fetched_hucs <- shiny::reactiveVal(NULL)
+    base_huc_level <- shiny::reactiveVal(8)
     all_hucs_sf <- shiny::reactiveVal(NULL)
     included_huc_ids <- shiny::reactiveVal(character(0))
     drawn_polygon_sf <- shiny::reactiveVal(NULL)
@@ -123,7 +138,7 @@ leafletServer <- function(id, max_hucs = 6) {
     # Helper to resolve HUC ID column name across all HUC levels
     get_huc_col <- function(df) {
       cols <- names(df)
-      for (c in c("huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
+      for (c in c("huc16", "huc14", "huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
         if (c %in% cols) {
           return(c)
         }
@@ -257,6 +272,7 @@ leafletServer <- function(id, max_hucs = 6) {
       is_drawing(TRUE)
       drawn_polygon_sf(NULL)
       huc_boundary(NULL)
+      raw_fetched_hucs(NULL)
       all_hucs_sf(NULL)
       included_huc_ids(character(0))
       leaflet::leafletProxy("mapper", session = session) |>
@@ -343,6 +359,7 @@ leafletServer <- function(id, max_hucs = 6) {
       is_drawing(FALSE)
       drawn_polygon_sf(NULL)
       huc_boundary(NULL)
+      raw_fetched_hucs(NULL)
       all_hucs_sf(NULL)
       included_huc_ids(character(0))
       leaflet::leafletProxy("mapper", session = session) |>
@@ -361,6 +378,7 @@ leafletServer <- function(id, max_hucs = 6) {
       is_drawing(FALSE)
       drawn_polygon_sf(NULL)
       huc_boundary(NULL)
+      raw_fetched_hucs(NULL)
       all_hucs_sf(NULL)
       included_huc_ids(character(0))
       leaflet::leafletProxy("mapper", session = session) |>
@@ -384,7 +402,22 @@ leafletServer <- function(id, max_hucs = 6) {
 
       status_msg("<div style='color:blue;'><b>Processing:</b> Querying USGS for watersheds in region...</div>")
       shiny::withProgress(message = "Searching Regional Watersheds...", value = 0.5, {
-        hucs <- get_hucs_from_polygon(poly, max_hucs = get_max_hucs())
+        raw_hucs <- get_hucs_from_polygon(poly, huc_level = 12, max_hucs = 100)
+        raw_fetched_hucs(raw_hucs)
+
+        if (!is.null(raw_hucs) && nrow(raw_hucs) > 0) {
+          raw_col <- get_huc_col(raw_hucs)
+          actual_digits <- nchar(as.character(raw_hucs[[raw_col]][1]))
+          if (!is.na(actual_digits) && actual_digits >= 2 && actual_digits <= 12) {
+            base_huc_level(actual_digits)
+            target_lvl <- get_huc_level()
+            if (is.numeric(target_lvl) && target_lvl > actual_digits) {
+              target_lvl <- actual_digits
+            }
+          }
+        }
+
+        hucs <- aggregate_hucs(raw_hucs, target_level = target_lvl)
 
         if (!is.null(hucs) && nrow(hucs) > 0) {
           huc_col <- get_huc_col(hucs)
@@ -403,12 +436,58 @@ leafletServer <- function(id, max_hucs = 6) {
 
           huc_boundary(hucs)
         } else {
+          raw_fetched_hucs(NULL)
           all_hucs_sf(NULL)
           included_huc_ids(character(0))
           status_msg("<div style='color:orange;'><b>Warning:</b> No USGS Watershed topology found in drawn region. Try adjusting boundary.</div>")
         }
       })
     })
+
+    # Observer for HUC Level slider changes: re-aggregates cached base shapes in memory (0 API calls)
+    # or fetches finer HUC layer if user switches from a broad cached level (e.g. HUC08) to a finer level (e.g. HUC12).
+    shiny::observeEvent(get_huc_level(), {
+      raw_hucs <- raw_fetched_hucs()
+      if (is.null(raw_hucs) || nrow(raw_hucs) == 0) return()
+      
+      huc_col <- get_huc_col(raw_hucs)
+      curr_digits <- nchar(as.character(raw_hucs[[huc_col]][1]))
+      target_digits <- if (is.numeric(get_huc_level())) as.integer(get_huc_level()) else as.integer(gsub("[^0-9]", "", get_huc_level()))
+      
+      poly <- drawn_polygon_sf()
+      
+      # 0 API Calls when cached geometries are finer (HUC12 -> HUC08); API refetch only if user requests finer detail than cached (HUC08 -> HUC12)
+      hucs <- if (!is.na(curr_digits) && !is.na(target_digits) && target_digits > curr_digits && !is.null(poly)) {
+        shiny::withProgress(message = "Fetching Finer HUC Layer...", value = 0.5, {
+          new_raw <- get_hucs_from_polygon(poly, huc_level = get_huc_level(), max_hucs = get_max_hucs())
+          if (!is.null(new_raw) && nrow(new_raw) > 0) {
+            raw_fetched_hucs(new_raw)
+            new_raw
+          } else {
+            raw_hucs
+          }
+        })
+      } else {
+        aggregate_hucs(raw_hucs, target_level = get_huc_level())
+      }
+
+      if (!is.null(hucs) && nrow(hucs) > 0) {
+        huc_col <- get_huc_col(hucs)
+        huc_type <- toupper(huc_col)
+        huc_ids <- as.character(hucs[[huc_col]])
+        huc_names <- if ("name" %in% names(hucs)) hucs$name else rep("", length(huc_ids))
+        n_hucs <- length(huc_ids)
+
+        all_hucs_sf(hucs)
+        included_huc_ids(huc_ids)
+        render_huc_shapes(hucs, huc_ids)
+
+        huc_str <- paste(paste0(huc_ids, " (", huc_names, ")"), collapse = ", ")
+        status_msg(paste0("<div style='color:green;'><b>Identified ", n_hucs, " ", huc_type, " Watersheds in Region:</b><br/>", huc_str, "<br/><i>Click any polygon on map to toggle inclusion/exclusion.</i></div>"))
+
+        huc_boundary(hucs)
+      }
+    }, ignoreInit = TRUE)
 
     # Observer for Single User Clicks (Point click reverse geocoding API calls disabled)
     # Map taps do not trigger network calls; users outline regions using the draw toolbar or search by HUC ID
@@ -425,7 +504,8 @@ leafletServer <- function(id, max_hucs = 6) {
       set_included_ids = update_included_ids,
       status = status_msg,
       click = shiny::reactive(input$mapper_click),
-      drawn_polygon = drawn_polygon_sf
+      drawn_polygon = drawn_polygon_sf,
+      base_level = base_huc_level
     ))
   })
 }

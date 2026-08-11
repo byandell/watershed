@@ -5,6 +5,7 @@
 \alias{build_base_map}
 \alias{add_draw_toolbar}
 \alias{get_huc_from_point}
+\alias{aggregate_hucs}
 \alias{get_hucs_from_polygon}
 \alias{add_leaflet_hex_overlay}
 \title{Interactive Leaflet Geographic Utilities}
@@ -15,7 +16,9 @@ add_draw_toolbar(map)
 
 get_huc_from_point(lng, lat)
 
-get_hucs_from_polygon(polygon_sf, max_hucs = 6)
+aggregate_hucs(hucs_sf, target_level = 8)
+
+get_hucs_from_polygon(polygon_sf, huc_level = 8, max_hucs = 6)
 
 add_leaflet_hex_overlay(
   map,
@@ -31,7 +34,13 @@ add_leaflet_hex_overlay(
 
 \item{lat}{Numeric latitude coordinate}
 
-\item{polygon_sf}{An `sf` or `sfc` polygon object representing a drawn rubberband region.}
+\item{hucs_sf}{An `sf` data frame of fine HUC polygon geometries.}
+
+\item{target_level}{Target HUC digit level (2-12, numeric or character, default: 8).}
+
+\item{polygon_sf}{An `sf` or `sfc` polygon or point object representing a drawn rubberband region or marker.}
+
+\item{huc_level}{Target USGS HUC digit level (2, 4, 6, 8, 10, 12, or character e.g. "huc08"). Single-digit numbers are padded ("huc02", "huc04", "huc06", "huc08").}
 
 \item{max_hucs}{Maximum number of subwatersheds before scaling up to broader HUC levels (default: 6, targeting 5-7 regions).}
 
@@ -48,7 +57,9 @@ A Leaflet map object with draw toolbar attached.
 
 `get_huc_from_point`: An `sf` polygon representation of the covering HUC12.
 
-`get_hucs_from_polygon`: An `sf` data frame of overlapping HUC subwatersheds (auto-scaled via code-annealed prefix matching).
+`aggregate_hucs`: An `sf` data frame of aggregated parent HUC geometries.
+
+`get_hucs_from_polygon`: An `sf` data frame of overlapping HUC subwatersheds (auto-scaled via area & code-annealed prefix matching).
 
 `add_leaflet_hex_overlay`: Updated `leaflet` map object.
 }
@@ -56,4 +67,7 @@ A Leaflet map object with draw toolbar attached.
 Helper utilities for building interactive Leaflet base maps with search capabilities,
 reverse-geocoding points to USGS HUC12 subwatershed boundaries, and rendering spatial
 hexagonal grid overlays.
+
+Combines fine HUC polygons (e.g. HUC12s) into broader HUC levels (HUC10, HUC08, HUC06, HUC04, HUC02)
+by prefix matching and spatial union without requiring additional spatial network requests.
 }

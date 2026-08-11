@@ -12,8 +12,8 @@ hexmapInput <- function(id) {
   shiny::tagList(
     shiny::h4("Hexagonal Watershed Controls"),
     shiny::p(shiny::HTML("Search or outline a region on the Leaflet map, configure grid options, and generate hex topology.")),
-    shiny::sliderInput(ns("max_hucs"), "Watersheds:",
-      min = 3, max = 15, value = 6, step = 1
+    shiny::sliderInput(ns("huc_level"), "HUC Level:",
+      min = 2, max = 12, value = 8, step = 2
     ),
     shiny::checkboxInput(ns("show_habitat"), "Overlay Habitat Features & Landmarks", value = TRUE),
     shiny::uiOutput(ns("feature_selector")),
@@ -74,8 +74,16 @@ hexmapServer <- function(id) {
 
     status_msg <- shiny::reactiveVal("")
 
-    # Module Composition: Delegate map discovery to leafletServer module with dynamic max_hucs granularity
-    leaflet_mod <- leafletServer("map", max_hucs = shiny::reactive(input$max_hucs))
+    # Module Composition: Delegate map discovery to leafletServer module with dynamic HUC level granularity
+    leaflet_mod <- leafletServer("map", huc_level = shiny::reactive(input$huc_level))
+
+    # Auto-update HUC Level slider to match actual base level determined for the region
+    shiny::observeEvent(leaflet_mod$base_level(), {
+      lvl <- leaflet_mod$base_level()
+      if (!is.null(lvl) && is.numeric(lvl) && lvl >= 2 && lvl <= 12) {
+        shiny::updateSliderInput(session, "huc_level", value = lvl)
+      }
+    }, ignoreInit = TRUE)
 
 
 
@@ -131,11 +139,25 @@ hexmapServer <- function(id) {
         current_sel <- unname(as.character(input$huc12_id))
         if (is.null(current_sel)) current_sel <- character(0)
 
+        # Clear selectize choices & selection when region is cleared
+        if (is.null(all_sf) || nrow(all_sf) == 0) {
+          if (length(current_sel) > 0) {
+            shiny::updateSelectizeInput(
+              session,
+              "huc12_id",
+              choices = character(0),
+              selected = character(0),
+              server = FALSE
+            )
+          }
+          return()
+        }
+
         # Only trigger updateSelectizeInput if map selection differs from current sidebar selection
-        if (!is.null(all_sf) && nrow(all_sf) > 0 && !setequal(inc_ids, current_sel)) {
+        if (!setequal(inc_ids, current_sel)) {
           cols <- names(all_sf)
           huc_col <- NULL
-          for (c in c("huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
+          for (c in c("huc16", "huc14", "huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
             if (c %in% cols) {
               huc_col <- c
               break
@@ -156,7 +178,7 @@ hexmapServer <- function(id) {
           )
         }
       },
-      ignoreNULL = TRUE
+      ignoreNULL = FALSE
     )
 
     # Push sidebar selection changes back to leaflet module map shape rendering
@@ -164,6 +186,21 @@ hexmapServer <- function(id) {
       {
         selected_vec <- unname(as.character(input$huc12_id))
         if (is.null(selected_vec)) selected_vec <- character(0)
+
+        all_sf <- leaflet_mod$all_hucs()
+        if (!is.null(all_sf) && nrow(all_sf) > 0) {
+          huc_col <- NULL
+          for (c in c("huc16", "huc14", "huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
+            if (c %in% names(all_sf)) { huc_col <- c; break }
+          }
+          if (is.null(huc_col)) huc_col <- names(all_sf)[1]
+          valid_ids <- unname(as.character(all_sf[[huc_col]]))
+
+          # Ignore obsolete selection values from a different HUC digit level during level transitions
+          if (length(selected_vec) > 0 && length(valid_ids) > 0 && nchar(selected_vec[1]) != nchar(valid_ids[1])) {
+            return()
+          }
+        }
 
         current_inc <- unname(as.character(leaflet_mod$included_ids()))
         if (!setequal(selected_vec, current_inc)) {
@@ -190,7 +227,11 @@ hexmapServer <- function(id) {
 
       # Zero-API-Call Cache: If candidate HUC geometries exist in memory, filter locally!
       if (!is.null(all_sf) && nrow(all_sf) > 0) {
-        huc_col <- if ("huc12" %in% names(all_sf)) "huc12" else if ("huc10" %in% names(all_sf)) "huc10" else if ("huc8" %in% names(all_sf)) "huc8" else names(all_sf)[1]
+        huc_col <- NULL
+        for (c in c("huc16", "huc14", "huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
+          if (c %in% names(all_sf)) { huc_col <- c; break }
+        }
+        if (is.null(huc_col)) huc_col <- names(all_sf)[1]
         mem_ids <- as.character(all_sf[[huc_col]])
         if (all(huc_vec %in% mem_ids)) {
           return(all_sf[mem_ids %in% huc_vec, ])
@@ -202,7 +243,9 @@ hexmapServer <- function(id) {
       shiny::withProgress(message = "Fetching USGS Base Boundary...", value = 0.3, {
         res <- tryCatch(
           {
-            suppressWarnings(nhdplusTools::get_huc(id = huc_vec, type = "huc12"))
+            n_digits <- nchar(huc_vec[1])
+            huc_type <- sprintf("huc%02d", n_digits)
+            suppressWarnings(nhdplusTools::get_huc(id = huc_vec, type = huc_type))
           },
           error = function(e) NULL
         )

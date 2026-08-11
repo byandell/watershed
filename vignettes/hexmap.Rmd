@@ -72,3 +72,18 @@ The **`hexmap`** R package was extracted from `ewing` into a standalone reposito
 - **Point Selection & Compact Marker Styling**:
   - Configured single-click point selection via the Pin Marker draw tool (`markerOptions`).
   - Styled point selections on the Leaflet map with a compact `3.5px` solid black circle marker (`color = "#000000"`, `fillOpacity = 0.9`).
+
+## 5. HUC Level Selection & In-Memory Spatial Aggregation
+
+- **Sidebar HUC Level Control (`2–12`)**:
+  - Configured sidebar slider in [`R/hexmapApp.R`](../R/hexmapApp.R) (`input$huc_level`, `min = 2, max = 12, value = 8, step = 2`) to select target HUC digit levels (`HUC02` through `HUC12`).
+  - Formatted HUC layer names and code identifiers with standard two-digit zero padding (`"huc02"`, `"huc04"`, `"huc06"`, `"huc08"`, `"huc10"`, `"huc12"`).
+
+- **0-API-Call In-Memory Spatial Union Aggregation**:
+  - Added `aggregate_hucs(hucs_sf, target_level)` in [`R/leaflet.R`](../R/leaflet.R) for zero-overhead in-memory spatial union (`sf::st_union`) of cached base geometries (`raw_fetched_hucs`).
+  - Moving the slider from finer to broader levels (e.g. `12` $\rightarrow$ `10` $\rightarrow$ `8` $\rightarrow$ `6` $\rightarrow$ `4` $\rightarrow$ `2`) re-aggregates shapes in real-time with **0 network API calls**.
+
+- **Area-Based Query Scaling & UI Synchronization**:
+  - Scaled initial queries based on drawn polygon extent ($km^2$) to avoid REST API timeouts over multi-state regions.
+  - Automatically synced the sidebar slider (`shiny::updateSliderInput`) to match the safest base level determined for the region upon searching.
+  - Reset sidebar selectize dropdown choices and selected values (`input$huc12_id`) in sync when clicking **Clear Region** or purging drawn shapes.

@@ -56,15 +56,15 @@ USGS NHDPlus organizes watersheds into hierarchical Hydrologic Unit Codes (HUC):
 ### Dynamic Auto-Scaling (Code-Annealing)
 
 When drawing a regional polygon across a large geographic area:
-- Small drawn regions (e.g. a small county) return fine-grained **HUC12** subwatersheds.
-- Large drawn regions (spanning multiple counties or states) could return 1000+ HUC12s, cluttering the map and slowing down processing.
-- `hexmap` automatically scales HUC granularity using **code-annealed prefix matching** (`HUC12` $\rightarrow$ `HUC10` $\rightarrow$ `HUC08` $\rightarrow$ `HUC06` $\rightarrow$ `HUC04`) to keep the total number of returned subwatersheds $\le \text{Max Target HUCs}$.
+- Small drawn regions (e.g. a small county) or point markers return fine-grained **HUC12** subwatersheds.
+- Large drawn regions (spanning multiple counties or states) automatically scale starting queries to broader levels (**HUC06** / **HUC04**) based on region area to avoid fetching thousands of tiny HUC12 shapes.
+- `hexmap` automatically scales HUC granularity using area-based initial query scaling and **code-annealed prefix matching** (`HUC12` $\rightarrow$ `HUC10` $\rightarrow$ `HUC08` $\rightarrow$ `HUC06` $\rightarrow$ `HUC04` $\rightarrow$ `HUC02`).
 
 ### Adjusting Granularity in `hexmapApp()`
 
-Use the **Max Target HUCs (Granularity)** slider in the sidebar (default: `6`, range: `3` to `15`):
-- **Lower values (3–5):** Produces fewer, larger parent sub-basins (`HUC08` or `HUC06`).
-- **Higher values (10–15):** Allows more fine-grained subwatersheds (`HUC12` or `HUC10`).
+Use the **HUC Level** slider in the sidebar (default: `8`, range: `2` to `12`, step: `2`):
+- **Lower levels (2–6):** Selects broad regional sub-basins (`HUC02`, `HUC04`, or `HUC06`).
+- **Higher levels (10–12):** Allows more fine-grained subwatersheds (`HUC10` or `HUC12`).
 
 ---
 

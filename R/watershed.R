@@ -30,16 +30,23 @@ get_watershed <- function(huc_id, feature_name = NULL, huc_layer = NULL) {
   }
   
   if (is.null(huc_layer)) {
-    huc_layer <- suppressWarnings(nhdplusTools::get_huc(id = huc_id, type = "huc12"))
+    n_digits <- nchar(huc_id[1])
+    huc_type <- sprintf("huc%02d", n_digits)
+    huc_layer <- suppressWarnings(nhdplusTools::get_huc(id = huc_id, type = huc_type))
   }
   
   if (is.null(huc_layer) || nrow(huc_layer) == 0) {
-    stop("Invalid HUC12 ID or could not retrieve watershed data from USGS.")
+    stop("Invalid HUC ID or could not retrieve watershed data from USGS.")
   }
   
   # Track individual component HUCs if multi-HUC
   individual_hucs <- huc_layer
-  actual_huc_ids <- if ("huc12" %in% names(huc_layer)) unique(huc_layer$huc12) else huc_id
+  cols <- names(huc_layer)
+  huc_col <- NULL
+  for (c in c("huc16", "huc14", "huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
+    if (c %in% cols) { huc_col <- c; break }
+  }
+  actual_huc_ids <- if (!is.null(huc_col)) unique(huc_layer[[huc_col]]) else huc_id
   
   if (!is.null(feature_name)) {
     if (!requireNamespace("osmdata", quietly = TRUE)) {
@@ -166,10 +173,11 @@ add_watershed_hex_overlay <- function(huc_info, hex_diameter = 0.01) {
 #'
 #' @importFrom ggplot2 autoplot ggplot geom_sf theme_minimal ggtitle labs
 autoplot.watershed_hex_overlay <- function(object, ...) {
+  huc_digits <- if (length(object$huc_id) > 0) sprintf("%02d", nchar(object$huc_id[1])) else "12"
   huc_str <- if (length(object$huc_id) > 1) {
-    paste0(length(object$huc_id), " Combined HUC12s")
+    paste0(length(object$huc_id), " Combined HUC", huc_digits, "s")
   } else {
-    paste("Watershed:", object$huc_id)
+    paste0("HUC", huc_digits, ": ", object$huc_id)
   }
   
   title_txt <- paste("Geographic Hexagonal Grid (", huc_str, ")", 
