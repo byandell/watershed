@@ -231,3 +231,79 @@ Imports:
     httr2
 
 ```
+
+### Function Integration to Package
+
+To integrate `add_streamstats_layer()` into your package's map creation pipeline, you can update [`R/leaflet.R`](https://github.com/byandell/hexmap/blob/main/R/leaflet.R) (or where your main Leaflet map-building function resides).
+
+Here is how you can incorporate it depending on whether you are using a static coordinate point or linking it to user clicks in a Shiny application context.
+
+---
+
+#### 1. Directly in Map Construction (`R/leaflet.R`)
+
+If your package has a map generation function (e.g., `create_hex_map()` or `draw_leaflet()`), you can pipe `add_streamstats_layer()` directly into the `leaflet` chain:
+
+```R
+#' Create Leaflet Map with StreamStats Layer
+#'
+#' @param lat Latitude for the stream/watershed point.
+#' @param lng Longitude for the stream/watershed point.
+#' @param rcode Two-letter state/region code (e.g., "WI").
+#' @return A leaflet map object.
+#' @export
+create_hex_map <- function(lat = NULL, lng = NULL, rcode = "WI") {
+  
+  map <- leaflet::leaflet() %>%
+    leaflet::addTiles()
+  
+  # Conditionally add the StreamStats layer if coordinates are provided
+  if (!is.null(lat) && !is.null(lng)) {
+    map <- map %>%
+      add_streamstats_layer(
+        lat = lat, 
+        lng = lng, 
+        rcode = rcode,
+        layer_group = "StreamStats Layer"
+      )
+  }
+  
+  # Add your hex overlay and controls
+  # map <- map %>% addPolygons(...)
+  
+  return(map)
+}
+
+```
+
+---
+
+#### 2. Dynamically on User Click (`R/hexmapApp.R` or `R/leafletApp.R`)
+
+If your package runs a Shiny app ([`hexmapApp.R`](https://github.com/byandell/hexmap/blob/main/R/hexmapApp.R) / [`leafletApp.R`](https://github.com/byandell/hexmap/blob/main/R/leafletApp.R)) and you want users to click on the Leaflet map to generate the watershed/stream layer dynamically, update your `server` logic with `leafletProxy()`:
+
+```R
+# Inside your Shiny server function:
+observeEvent(input$map_click, {
+  click <- input$map_click
+  req(click)
+  
+  # Update existing map without re-rendering the whole widget
+  leaflet::leafletProxy("map") %>%
+    # Optionally clear previous stream layers before drawing a new one
+    leaflet::clearGroup("StreamStats Layer") %>% 
+    add_streamstats_layer(
+      lat = click$lat,
+      lng = click$lng,
+      rcode = "WI", # Or bind to a region input reactively: input$state_code
+      layer_group = "StreamStats Layer"
+    )
+})
+
+```
+
+---
+
+#### 3. Namespace Export (`NAMESPACE`)
+
+Since you added [`add_streamstats_layer.R`](https://github.com/byandell/hexmap/blob/main/R/add_streamstats_layer.R) as a new file in your [`R/`](https://github.com/byandell/hexmap/tree/main) directory, make sure to add `#' @export` above the function definition and run `devtools::document()` (or `roxygen2::roxygenise()`) so that `export(add_streamstats_layer)` is written to your `NAMESPACE` file and available to users of `hexmap`.
