@@ -107,6 +107,8 @@ streamsInput <- function(id, mode = c("standalone", "sidebar")) {
 #'   (e.g., \code{session$ns("map-mapper")}). When provided, stream flowlines and legends render to this proxy.
 #' @param watershed_sf Optional reactive expression returning an \code{sf} polygon object representing
 #'   the active HUC watershed boundary. When supplied, flowlines are automatically queried and synchronized.
+#' @param huc_level Optional reactive expression returning the active numeric HUC level (e.g. 2, 4, 6, 8, 10, 12)
+#'   to dynamically scale default stream order granularity.
 #' @param show_hex_reactive Optional reactive expression returning logical whether hex grid is active (for legend sync).
 #' @param show_habitat_reactive Optional reactive expression returning logical whether habitat is active (for legend sync).
 #' @param default_lat Initial latitude for the map view (default: 43.0731)
@@ -124,6 +126,7 @@ streamsServer <- function(id,
                           map_proxy_id = NULL,
                           parent_session = NULL,
                           watershed_sf = NULL,
+                          huc_level = NULL,
                           show_hex_reactive = NULL,
                           show_habitat_reactive = NULL,
                           default_lat = 43.0731,
@@ -131,6 +134,19 @@ streamsServer <- function(id,
                           default_zoom = 9) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # Auto-adjust default min_stream_order based on active HUC level
+    if (!is.null(huc_level) && shiny::is.reactive(huc_level)) {
+      shiny::observeEvent(huc_level(), {
+        lvl <- huc_level()
+        if (!is.null(lvl) && is.numeric(lvl)) {
+          target_ord <- if (lvl <= 4) 5 else if (lvl <= 6) 4 else if (lvl <= 8) 3 else if (lvl <= 10) 2 else 1
+          if (!is.null(input$min_stream_order) && input$min_stream_order != target_ord) {
+            shiny::updateSliderInput(session, "min_stream_order", value = target_ord)
+          }
+        }
+      }, ignoreInit = TRUE)
+    }
 
     # Helper function to get the appropriate leafletProxy with correct session namespace scoping
     get_proxy <- function() {
@@ -176,8 +192,7 @@ streamsServer <- function(id,
 
     # --- Mode 1: Embedded Watershed Synchronization (when watershed_sf is provided) ---
     # Stage 1: Spatial Fetch Reactive
-    # Fetches un-thinned flowlines (min_stream_order = 1) from remote USGS or in-memory cache
-    # Only triggered when watershed boundary, stream extent, or buffer radius changes.
+    # Queries flowlines with server-side streamorder filtering matching slider/HUC scale
     raw_flowlines_sf <- shiny::reactive({
       if (is.null(watershed_sf) || !shiny::is.reactive(watershed_sf)) return(NULL)
       w_sf <- watershed_sf()
@@ -188,8 +203,9 @@ streamsServer <- function(id,
       }
 
       buf_km <- if (!is.null(throttled_buffer_km())) throttled_buffer_km() else 5
+      min_ord <- if (!is.null(throttled_min_order())) throttled_min_order() else 4
       tryCatch(
-        get_watershed_flowlines(w_sf, min_stream_order = 1, extent = ext, buffer_km = buf_km),
+        get_watershed_flowlines(w_sf, min_stream_order = min_ord, extent = ext, buffer_km = buf_km),
         error = function(e) NULL
       )
     })

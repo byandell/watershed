@@ -269,6 +269,7 @@ watershedServer <- function(id) {
       map_proxy_id = "map-mapper",
       parent_session = session,
       watershed_sf = base_huc,
+      huc_level = shiny::reactive(input$huc_level),
       show_hex_reactive = shiny::reactive(input$enable_hex),
       show_habitat_reactive = shiny::reactive(input$show_habitat)
     )

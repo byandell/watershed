@@ -355,6 +355,7 @@ get_watershed_flowlines <- function(watershed_obj,
   
   aoi_4326 <- sf::st_transform(aoi, 4326)
   buf_dist <- if (!is.null(buffer_km) && is.numeric(buffer_km)) buffer_km else 5
+  query_order <- if (is.numeric(min_stream_order) && min_stream_order > 1) as.integer(min_stream_order) else NULL
 
   # Determine if input sf contains identifiable HUC IDs for granular per-HUC caching
   huc_col <- NULL
@@ -371,25 +372,33 @@ get_watershed_flowlines <- function(watershed_obj,
   if (!is.null(huc_col) && nrow(aoi_4326) > 0) {
     huc_ids <- as.character(aoi_4326[[huc_col]])
     
-    # Check which HUCs are already cached in memory
     cached_list <- list()
     missing_hucs <- character(0)
     
     for (i in seq_along(huc_ids)) {
       hid <- huc_ids[i]
-      h_key <- sprintf("huc_%s_ext_%s_buf_%s", hid, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"))
+      h_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_%s", hid, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"), ifelse(is.null(query_order), "1", as.character(query_order)))
       
+      # Also check if a broader / finer order cache exists for this HUC
+      found_cache <- NULL
       if (exists(h_key, envir = .watershed_flowline_cache, inherits = FALSE)) {
-        fl_cached <- get(h_key, envir = .watershed_flowline_cache, inherits = FALSE)
-        if (!is.null(fl_cached) && inherits(fl_cached, "sf") && nrow(fl_cached) > 0) {
-          cached_list[[hid]] <- fl_cached
+        found_cache <- get(h_key, envir = .watershed_flowline_cache, inherits = FALSE)
+      } else {
+        # Check if an unconstrained order 1 cache exists
+        h_base_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_1", hid, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"))
+        if (exists(h_base_key, envir = .watershed_flowline_cache, inherits = FALSE)) {
+          found_cache <- get(h_base_key, envir = .watershed_flowline_cache, inherits = FALSE)
         }
+      }
+      
+      if (!is.null(found_cache) && inherits(found_cache, "sf") && nrow(found_cache) > 0) {
+        cached_list[[hid]] <- found_cache
       } else {
         missing_hucs <- c(missing_hucs, hid)
       }
     }
     
-    # Query USGS only for missing HUC geometries
+    # Query USGS with remote streamorder filter only for missing HUC geometries
     if (length(missing_hucs) > 0) {
       missing_mask <- aoi_4326[[huc_col]] %in% missing_hucs
       missing_sf <- aoi_4326[missing_mask, ]
@@ -397,7 +406,7 @@ get_watershed_flowlines <- function(watershed_obj,
       for (j in seq_len(nrow(missing_sf))) {
         single_huc_sf <- missing_sf[j, ]
         single_id <- as.character(single_huc_sf[[huc_col]])
-        h_key <- sprintf("huc_%s_ext_%s_buf_%s", single_id, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"))
+        h_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_%s", single_id, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"), ifelse(is.null(query_order), "1", as.character(query_order)))
         
         single_union <- suppressWarnings(sf::st_union(single_huc_sf))
         single_bb <- sf::st_bbox(single_huc_sf)
@@ -412,8 +421,9 @@ get_watershed_flowlines <- function(watershed_obj,
         
         q_envelope <- sf::st_as_sfc(sf::st_bbox(q_aoi))
         
+        # Pass streamorder to USGS API to filter line features before transfer
         fl_single <- tryCatch({
-          nhdplusTools::get_nhdplus(AOI = q_envelope, realization = "flowline")
+          nhdplusTools::get_nhdplus(AOI = q_envelope, streamorder = query_order, realization = "flowline")
         }, error = function(e) NULL)
         
         if (!is.null(fl_single) && inherits(fl_single, "sf") && nrow(fl_single) > 0) {
@@ -458,9 +468,10 @@ get_watershed_flowlines <- function(watershed_obj,
   aoi_union <- suppressWarnings(sf::st_union(aoi_4326))
   bb <- sf::st_bbox(aoi_4326)
   cache_key <- sprintf(
-    "ext_%s_buf_%s_bb_%.4f_%.4f_%.4f_%.4f",
+    "ext_%s_buf_%s_ord_%s_bb_%.4f_%.4f_%.4f_%.4f",
     extent,
     ifelse(extent == "buffer", as.character(buf_dist), "0"),
+    ifelse(is.null(query_order), "1", as.character(query_order)),
     bb["xmin"], bb["ymin"], bb["xmax"], bb["ymax"]
   )
 
@@ -483,7 +494,7 @@ get_watershed_flowlines <- function(watershed_obj,
   query_envelope <- sf::st_as_sfc(sf::st_bbox(query_aoi))
   
   flowlines <- tryCatch({
-    nhdplusTools::get_nhdplus(AOI = query_envelope, realization = "flowline")
+    nhdplusTools::get_nhdplus(AOI = query_envelope, streamorder = query_order, realization = "flowline")
   }, error = function(e) {
     warning("Failed to retrieve NHD stream flowlines: ", e$message)
     NULL

@@ -172,10 +172,12 @@ The `watershed` package provides seamless visual and analytical stream modeling:
   - Flowlines are cached at the individual HUC level (`.watershed_flowline_cache`). When composing multi-HUC regions, only newly added HUCs are fetched from USGS.
   - Removing a sub-watershed or deselecting a HUC drops its flowlines **instantly in memory with 0 network calls**. Deselecting all HUCs triggers immediate layer wipe.
   - Adjusting the **Min Stream Order** slider filters cached flowlines in memory instantly without making additional network requests.
-- **Strahler Stream Order Filtering:** Use the **Min Stream Order** slider (1 to 6, default: `4`) to filter flowlines by branching detail:
-  - *Order 1–2:* Small headwater creeks and intermittent tributaries.
-  - *Order 3–4:* Medium-sized rivers and main stems (default filter captures order 4+ for high-level structure).
-  - *Order 5–6+:* Major continental rivers (e.g. Mississippi, Wisconsin, Ohio).
+- **HUC-Adaptive Stream Order Scaling:** Stream order granularity automatically adapts to the active HUC level, passing `streamorder` directly to the USGS server to prevent heavy network payloads:
+  - **HUC 2 / 4 (Major Region):** Default **Order 5+** (Continental trunk rivers).
+  - **HUC 6 (River Basin):** Default **Order 4+** (Major river channels).
+  - **HUC 8 (Subbasin):** Default **Order 3+** (Named regional rivers).
+  - **HUC 10 (Watershed):** Default **Order 2+** (Branching tributaries).
+  - **HUC 12 (Subwatershed):** Default **Order 1+** (Detailed creeks and headwaters).
 - Line widths are automatically scaled by stream order, and clicking any stream polyline displays its GNIS name, order, and length.
 
 ### 3. Dynamic Map Legend
