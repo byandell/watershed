@@ -29,6 +29,67 @@ add_usgs_hydro_layer <- function(map, group = "USGS Hydrography (Streams)") {
   )
 }
 
+#' Add USGS 3DEP Shaded Relief (DEM) Map Tile Layer to Leaflet
+#'
+#' Adds the official USGS National Map 3D Elevation Program (3DEP) Shaded Relief WMS layer
+#' to a Leaflet map, providing a high-contrast terrain representation.
+#'
+#' @param map A \code{leaflet} map or \code{leafletProxy} object.
+#' @param group Character. Group name for layer controls (default: \code{"USGS Shaded Relief (DEM)"}).
+#'
+#' @return A modified \code{leaflet} or \code{leafletProxy} map object.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' library(leaflet)
+#' leaflet() |>
+#'     add_usgs_shaded_relief_layer()
+#' }
+add_usgs_shaded_relief_layer <- function(map, group = "USGS Shaded Relief (DEM)") {
+  if (!inherits(map, "leaflet") && !inherits(map, "leaflet_proxy")) {
+    stop("`map` must be a valid leaflet map or leafletProxy object.", call. = FALSE)
+  }
+  leaflet::addWMSTiles(
+    map = map,
+    baseUrl = "https://basemap.nationalmap.gov/arcgis/services/USGSShadedReliefOnly/MapServer/WMSServer",
+    layers = "0",
+    options = leaflet::WMSTileOptions(format = "image/png", transparent = TRUE),
+    attribution = "USGS 3DEP - The National Map",
+    group = group
+  )
+}
+
+#' Add USGS Topographic Map Tile Layer to Leaflet
+#'
+#' Adds the official USGS National Map Topographic WMS map layer to a Leaflet map.
+#'
+#' @param map A \code{leaflet} map or \code{leafletProxy} object.
+#' @param group Character. Group name for layer controls (default: \code{"USGS Topo"}).
+#'
+#' @return A modified \code{leaflet} or \code{leafletProxy} map object.
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' library(leaflet)
+#' leaflet() |>
+#'     add_usgs_topo_layer()
+#' }
+add_usgs_topo_layer <- function(map, group = "USGS Topo") {
+  if (!inherits(map, "leaflet") && !inherits(map, "leaflet_proxy")) {
+    stop("`map` must be a valid leaflet map or leafletProxy object.", call. = FALSE)
+  }
+  leaflet::addWMSTiles(
+    map = map,
+    baseUrl = "https://basemap.nationalmap.gov/arcgis/services/USGSTopo/MapServer/WMSServer",
+    layers = "0",
+    options = leaflet::WMSTileOptions(format = "image/png", transparent = TRUE),
+    attribution = "USGS Topo - The National Map",
+    group = group
+  )
+}
+
 #' Add StreamStats Layer and Vector Stream Flowlines to Leaflet Map
 #'
 #' Queries the USGS StreamStats SS-Delineate API for a specified location and state/region code

@@ -43,6 +43,8 @@ reference:
       - add_watershed_hex_overlay
       - add_streamstats_layer
       - add_usgs_hydro_layer
+      - add_usgs_shaded_relief_layer
+      - add_usgs_topo_layer
       - discover_watershed_features
   - title: "Leaflet Interactive Mapping Utilities"
     contents:

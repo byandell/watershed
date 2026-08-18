@@ -120,7 +120,8 @@ To maintain clean separation of concerns and achieve **zero code duplication**, 
    - Returns a reactive list of outputs (`$flowlines`, `$show_flowlines`, `$min_stream_order`, `$show_legend`, `$status`) to parent callers.
 
 3. **Leaflet Proxy & Base Map Capabilities ([`R/leaflet.R`](../R/leaflet.R))**:
-   - Upgraded `build_base_map()` with multi-provider base groups (*CartoDB Positron*, *OpenStreetMap*, *Satellite Imagery*) and the transparent USGS Hydrography WMS overlay layer.
+   - Upgraded `build_base_map()` with multi-provider base groups (*CartoDB Positron*, *USGS Shaded Relief (DEM)*, *USGS Topo*, *OpenStreetMap*, *Satellite Imagery*) and the transparent USGS Hydrography WMS overlay layer.
+   - Added `add_usgs_shaded_relief_layer()` and `add_usgs_topo_layer()` to render official USGS 3DEP elevation hillshades and topographic maps.
    - Added `add_leaflet_flowlines()` to render NHD flowlines weighted by stream order (`streamorde`) with clickable popups (stream names, orders, segment lengths).
    - Added `add_watershed_legend()` to render dynamic, color-coded map legends for active layers.
 

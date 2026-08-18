@@ -157,11 +157,13 @@ streamsServer <- function(id,
     output$stream_map <- leaflet::renderLeaflet({
       leaflet::leaflet() |>
         leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron, group = "CartoDB Positron") |>
+        add_usgs_shaded_relief_layer(group = "USGS Shaded Relief (DEM)") |>
+        add_usgs_topo_layer(group = "USGS Topo") |>
         leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap") |>
         leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite Imagery") |>
         add_usgs_hydro_layer(group = "USGS Hydrography (Streams)") |>
         leaflet::addLayersControl(
-          baseGroups = c("CartoDB Positron", "OpenStreetMap", "Satellite Imagery"),
+          baseGroups = c("CartoDB Positron", "USGS Shaded Relief (DEM)", "USGS Topo", "OpenStreetMap", "Satellite Imagery"),
           overlayGroups = c("USGS Hydrography (Streams)", "StreamStats Basin", "Stream Flowlines"),
           options = leaflet::layersControlOptions(collapsed = FALSE)
         ) |>

@@ -153,10 +153,13 @@ autoplot(topo)
 
 The `watershed` package provides seamless visual and analytical stream modeling:
 
-### 1. Continuous USGS Hydrography Map Tile Layer
-- `watershedApp()` and `streamsApp()` incorporate the official **USGS National Hydrography Cached WMS** layer (`add_usgs_hydro_layer()`).
-- Provides a transparent, high-contrast overlay of all streams, rivers, canals, and lakes across the US without obscuring the base map.
-- Toggle between base maps (*CartoDB Positron*, *OpenStreetMap*, *Satellite Imagery*) and overlays using the Leaflet layer control in the top-right corner.
+### 1. USGS Hydrography, 3DEP Shaded Relief (DEM) & Topographic Base Maps
+- `watershedApp()` and `streamsApp()` incorporate official USGS The National Map web map services:
+  - **`CartoDB Positron`:** Minimalist high-contrast light base map (default).
+  - **`USGS Shaded Relief (DEM)` (`add_usgs_shaded_relief_layer()`):** High-contrast 3D Elevation Program (3DEP) digital elevation hillshade rendering terrain contours, valleys, and ridge lines with exceptional clarity.
+  - **`USGS Topo` (`add_usgs_topo_layer()`):** Complete USGS topographic map integrating elevation contours, geographic names, and terrain shading.
+  - **`USGS Hydrography (Streams)` (`add_usgs_hydro_layer()`):** Transparent vector overlay of continuous waterways across the United States.
+- Toggle between base layers (*CartoDB Positron*, *USGS Shaded Relief (DEM)*, *USGS Topo*, *OpenStreetMap*, *Satellite Imagery*) using the Leaflet layer control in the top-right corner.
 
 ### 2. Interactive NHD Stream Flowlines, In-Memory Caching & User-Defined Extents
 - When stream flowlines are enabled via the **Stream Flowline Extent** radio control in `watershedApp()`, `watershed` extracts vector stream flowlines via `nhdplusTools::get_nhdplus()` for the active HUC boundaries.
