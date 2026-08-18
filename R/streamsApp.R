@@ -15,22 +15,22 @@ streamsInput <- function(id, mode = c("standalone", "sidebar")) {
   if (identical(mode, "sidebar")) {
     return(
       shiny::tagList(
-        shiny::checkboxInput(ns("show_flowlines"), "Overlay NHD Stream Flowlines", value = TRUE),
         shiny::radioButtons(
           inputId = ns("stream_extent"),
           label = "Stream Flowline Extent:",
           choices = c(
+            "None" = "none",
             "Constrained to HUC(s)" = "huc",
             "Extended Bounding Box" = "bbox",
             "Buffered HUC Region" = "buffer"
           ),
-          selected = "huc"
+          selected = "none"
         ),
         shiny::conditionalPanel(
           condition = sprintf("input['%s'] == 'buffer'", ns("stream_extent")),
           shiny::sliderInput(ns("stream_buffer_km"), "Buffer Distance (km):", min = 1, max = 25, value = 5, step = 1)
         ),
-        shiny::sliderInput(ns("min_stream_order"), "Min Stream Order:", min = 1, max = 6, value = 1, step = 1),
+        shiny::sliderInput(ns("min_stream_order"), "Min Stream Order:", min = 1, max = 6, value = 4, step = 1),
         shiny::checkboxInput(ns("show_legend"), "Display Map Legend", value = TRUE),
         shiny::actionButton(
           inputId = ns("clear_streams"),
@@ -122,6 +122,7 @@ streamsInput <- function(id, mode = c("standalone", "sidebar")) {
 #' @rdname streamsApp
 streamsServer <- function(id,
                           map_proxy_id = NULL,
+                          parent_session = NULL,
                           watershed_sf = NULL,
                           show_hex_reactive = NULL,
                           show_habitat_reactive = NULL,
@@ -130,6 +131,17 @@ streamsServer <- function(id,
                           default_zoom = 9) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # Helper function to get the appropriate leafletProxy with correct session namespace scoping
+    get_proxy <- function() {
+      if (!is.null(parent_session) && !is.null(map_proxy_id)) {
+        leaflet::leafletProxy(map_proxy_id, session = parent_session)
+      } else if (!is.null(map_proxy_id)) {
+        leaflet::leafletProxy(map_proxy_id, session = session)
+      } else {
+        leaflet::leafletProxy("stream_map", session = session)
+      }
+    }
 
     status_msg <- shiny::reactiveVal(
       "<div style='color:gray;'><i>Click any location or stream on the map to delineate the watershed basin and highlight stream flowlines.</i></div>"
@@ -158,20 +170,32 @@ streamsServer <- function(id,
 
     # --- Mode 1: Embedded Watershed Synchronization (when watershed_sf is provided) ---
     if (!is.null(watershed_sf) && shiny::is.reactive(watershed_sf)) {
-      shiny::observeEvent(list(watershed_sf(), input$show_flowlines, input$stream_extent, input$stream_buffer_km, input$min_stream_order), {
+      shiny::observeEvent(list(watershed_sf(), input$stream_extent, input$stream_buffer_km, input$min_stream_order), {
         w_sf <- watershed_sf()
-        if (!isTRUE(input$show_flowlines) || is.null(w_sf) || nrow(w_sf) == 0) {
+        ext <- if (!is.null(input$stream_extent)) input$stream_extent else "none"
+
+        if (ext == "none" || is.null(w_sf) || nrow(w_sf) == 0) {
           flowlines_sf(NULL)
           if (!is.null(map_proxy_id)) {
-            leaflet::leafletProxy(map_proxy_id) |>
+            proxy <- get_proxy() |>
               leaflet::clearGroup("Stream Flowlines")
+
+            # Update legend when flowlines are hidden
+            is_hex <- if (!is.null(show_hex_reactive) && shiny::is.reactive(show_hex_reactive)) isTRUE(show_hex_reactive()) else TRUE
+            is_hab <- if (!is.null(show_habitat_reactive) && shiny::is.reactive(show_habitat_reactive)) isTRUE(show_habitat_reactive()) else TRUE
+            add_watershed_legend(
+              proxy,
+              show_hex = is_hex,
+              show_streams = FALSE,
+              show_habitat = is_hab,
+              show_legend = isTRUE(input$show_legend)
+            )
           }
           return()
         }
 
-        ext <- if (!is.null(input$stream_extent)) input$stream_extent else "huc"
         buf_km <- if (!is.null(input$stream_buffer_km)) input$stream_buffer_km else 5
-        min_ord <- if (!is.null(input$min_stream_order)) input$min_stream_order else 1
+        min_ord <- if (!is.null(input$min_stream_order)) input$min_stream_order else 4
         
         fl <- tryCatch(
           get_watershed_flowlines(w_sf, min_stream_order = min_ord, extent = ext, buffer_km = buf_km),
@@ -181,7 +205,7 @@ streamsServer <- function(id,
         flowlines_sf(fl)
 
         if (!is.null(map_proxy_id)) {
-          proxy <- leaflet::leafletProxy(map_proxy_id) |>
+          proxy <- get_proxy() |>
             leaflet::clearGroup("Stream Flowlines")
 
           if (!is.null(fl) && nrow(fl) > 0) {
@@ -194,7 +218,7 @@ streamsServer <- function(id,
           add_watershed_legend(
             proxy,
             show_hex = is_hex,
-            show_streams = isTRUE(input$show_flowlines),
+            show_streams = TRUE,
             show_habitat = is_hab,
             show_legend = isTRUE(input$show_legend)
           )
@@ -221,8 +245,7 @@ streamsServer <- function(id,
       shiny::withProgress(message = "Delineating watershed basin & streams...", value = 0.4, {
         tryCatch(
           {
-            target_proxy <- if (!is.null(map_proxy_id)) map_proxy_id else "stream_map"
-            proxy <- leaflet::leafletProxy(target_proxy, session = session)
+            proxy <- get_proxy()
             add_streamstats_layer(
               map = proxy,
               lat = lat,
@@ -269,14 +292,14 @@ streamsServer <- function(id,
 
     # Observer for Legend Toggle
     shiny::observeEvent(input$show_legend, {
-      target_proxy <- if (!is.null(map_proxy_id)) map_proxy_id else "stream_map"
-      proxy <- leaflet::leafletProxy(target_proxy, session = session)
+      proxy <- get_proxy()
       is_hex <- if (!is.null(show_hex_reactive) && shiny::is.reactive(show_hex_reactive)) isTRUE(show_hex_reactive()) else TRUE
       is_hab <- if (!is.null(show_habitat_reactive) && shiny::is.reactive(show_habitat_reactive)) isTRUE(show_habitat_reactive()) else TRUE
+      has_streams <- !is.null(input$stream_extent) && input$stream_extent != "none"
       add_watershed_legend(
         proxy,
         show_hex = is_hex,
-        show_streams = isTRUE(input$show_flowlines),
+        show_streams = has_streams,
         show_habitat = is_hab,
         show_legend = isTRUE(input$show_legend)
       )
@@ -284,20 +307,20 @@ streamsServer <- function(id,
 
     # Clear Stream Layers
     shiny::observeEvent(input$clear_streams, {
-      target_proxy <- if (!is.null(map_proxy_id)) map_proxy_id else "stream_map"
-      leaflet::leafletProxy(target_proxy, session = session) |>
+      get_proxy() |>
         leaflet::clearGroup("StreamStats Basin") |>
         leaflet::clearGroup("Stream Flowlines")
 
       flowlines_sf(NULL)
+      shiny::updateRadioButtons(session, "stream_extent", selected = "none")
       status_msg("<div style='color:gray;'>Cleared stream delineations from map. Click map to add a new section.</div>")
     })
 
     # Return Reactive Outputs for Parent Modules
     return(list(
       flowlines = flowlines_sf,
-      show_flowlines = shiny::reactive(isTRUE(input$show_flowlines)),
-      min_stream_order = shiny::reactive(if (!is.null(input$min_stream_order)) input$min_stream_order else 1),
+      show_flowlines = shiny::reactive(!is.null(input$stream_extent) && input$stream_extent != "none"),
+      min_stream_order = shiny::reactive(if (!is.null(input$min_stream_order)) input$min_stream_order else 4),
       show_legend = shiny::reactive(isTRUE(input$show_legend)),
       status = status_msg
     ))

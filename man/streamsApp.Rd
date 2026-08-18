@@ -11,6 +11,7 @@ streamsInput(id, mode = c("standalone", "sidebar"))
 streamsServer(
   id,
   map_proxy_id = NULL,
+  parent_session = NULL,
   watershed_sf = NULL,
   show_hex_reactive = NULL,
   show_habitat_reactive = NULL,

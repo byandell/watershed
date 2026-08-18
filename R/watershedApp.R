@@ -256,7 +256,8 @@ watershedServer <- function(id) {
     # Module Composition: Delegate stream flowlines, hydrography, and dynamic legend to streamsServer module
     streams_mod <- streamsServer(
       "streams",
-      map_proxy_id = ns("map-mapper"),
+      map_proxy_id = "map-mapper",
+      parent_session = session,
       watershed_sf = base_huc,
       show_hex_reactive = shiny::reactive(input$enable_hex),
       show_habitat_reactive = shiny::reactive(input$show_habitat)
