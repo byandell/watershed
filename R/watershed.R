@@ -319,10 +319,13 @@ discover_watershed_features <- function(huc_id, feature_types = c("natural", "wa
   return(clean_names)
 }
 
+.watershed_flowline_cache <- new.env(parent = emptyenv())
+
 #' Extract NHD Stream Flowlines for a Watershed
 #'
 #' Queries the USGS National Hydrography Dataset (NHD) via `nhdplusTools` for stream
-#' flowlines intersecting a watershed boundary or geographic area.
+#' flowlines intersecting a watershed boundary or geographic area. Results are cached in
+#' memory to eliminate redundant network queries.
 #'
 #' @param watershed_obj A `watershed` S3 object or an `sf` polygon object.
 #' @param min_stream_order Minimum Strahler stream order to include (default: 1).
@@ -352,35 +355,67 @@ get_watershed_flowlines <- function(watershed_obj,
   
   aoi_4326 <- sf::st_transform(aoi, 4326)
   aoi_union <- suppressWarnings(sf::st_union(aoi_4326))
+  bb <- sf::st_bbox(aoi_4326)
   
-  # Ensure query AOI is passed as a single unified geometry to nhdplusTools
+  buf_dist <- if (!is.null(buffer_km) && is.numeric(buffer_km)) buffer_km else 5
+  cache_key <- sprintf(
+    "ext_%s_buf_%s_bb_%.4f_%.4f_%.4f_%.4f",
+    extent,
+    ifelse(extent == "buffer", as.character(buf_dist), "0"),
+    bb["xmin"], bb["ymin"], bb["xmax"], bb["ymax"]
+  )
+
+  # Check in-memory session cache (0 API calls)
+  if (exists(cache_key, envir = .watershed_flowline_cache, inherits = FALSE)) {
+    cached_fl <- get(cache_key, envir = .watershed_flowline_cache, inherits = FALSE)
+    if (!is.null(cached_fl) && nrow(cached_fl) > 0 && is.numeric(min_stream_order) && min_stream_order > 1 && "streamorde" %in% names(cached_fl)) {
+      return(cached_fl[!is.na(cached_fl$streamorde) & cached_fl$streamorde >= min_stream_order, ])
+    }
+    return(cached_fl)
+  }
+  
+  # Ensure query target geometry is formed
   query_aoi <- if (extent == "bbox") {
-    sf::st_as_sfc(sf::st_bbox(aoi_4326))
+    sf::st_as_sfc(bb)
   } else if (extent == "buffer") {
-    buf_dist <- if (!is.null(buffer_km) && is.numeric(buffer_km)) buffer_km else 5
     suppressWarnings(sf::st_transform(sf::st_buffer(sf::st_transform(aoi_union, 5070), buf_dist * 1000), 4326))
   } else {
     aoi_union
   }
   
+  # Optimization: Query remote API by bounding box envelope (substantially faster than complex multi-polygons)
+  query_envelope <- sf::st_as_sfc(sf::st_bbox(query_aoi))
+  
   flowlines <- tryCatch({
-    nhdplusTools::get_nhdplus(AOI = query_aoi, realization = "flowline")
+    nhdplusTools::get_nhdplus(AOI = query_envelope, realization = "flowline")
   }, error = function(e) {
     warning("Failed to retrieve NHD stream flowlines: ", e$message)
     NULL
   })
   
-  if (is.null(flowlines) || nrow(flowlines) == 0) return(NULL)
+  if (is.null(flowlines) || nrow(flowlines) == 0) {
+    assign(cache_key, NULL, envir = .watershed_flowline_cache)
+    return(NULL)
+  }
   
   flowlines <- sf::st_transform(flowlines, 4326)
   
-  # When constrained to HUC, filter to geometries physically intersecting the HUC boundaries
-  if (extent == "huc") {
+  # Retain only necessary columns for map rendering & attribute display
+  keep_cols <- intersect(c("comid", "gnis_name", "lengthkm", "streamorde", attr(flowlines, "sf_column")), names(flowlines))
+  if (length(keep_cols) > 0) {
+    flowlines <- flowlines[, keep_cols, drop = FALSE]
+  }
+  
+  # Spatial clipping to exact target geometry
+  if (extent %in% c("huc", "buffer")) {
     old_s2 <- suppressMessages(sf::sf_use_s2(FALSE))
-    inter <- suppressWarnings(lengths(sf::st_intersects(flowlines, aoi_union)) > 0)
+    inter <- suppressWarnings(lengths(sf::st_intersects(flowlines, query_aoi)) > 0)
     suppressMessages(sf::sf_use_s2(old_s2))
     flowlines <- flowlines[inter, ]
   }
+  
+  # Cache the full un-thinned flowline sf object for this AOI and extent
+  assign(cache_key, flowlines, envir = .watershed_flowline_cache)
   
   if (is.numeric(min_stream_order) && min_stream_order > 1 && "streamorde" %in% names(flowlines)) {
     flowlines <- flowlines[!is.na(flowlines$streamorde) & flowlines$streamorde >= min_stream_order, ]

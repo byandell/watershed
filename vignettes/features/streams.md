@@ -601,13 +601,14 @@ Warning in value[[3L]](cond) : Failed to retrieve NHD stream flowlines: the cond
 
 ### 2. User-Defined Stream Extent Selection (`R/streamsApp.R` & `R/watershed.R`)
 
-Added three user-selectable extent modes:
-1. **`Constrained to HUC(s)` (`extent = "huc"`, Default):** Clips the stream flowlines strictly to the selected HUC boundary polygon(s).
-2. **`Extended Bounding Box` (`extent = "bbox"`):** Retrieves all stream flowlines within the rectangular bounding box of the watershed region.
-3. **`Buffered HUC Region` (`extent = "buffer"`):** Expands the stream retrieval zone outward by a user-defined distance (`1` to `25 km`, slider default: `5 km`).
+Four user-selectable extent modes are supported via radio button controls:
+1. **`None` (`extent = "none"`, Default):** Initial default state; no stream flowlines are loaded, ensuring immediate map initialization and zero unnecessary API traffic.
+2. **`Constrained to HUC(s)` (`extent = "huc"`):** Clips stream flowlines strictly to the active HUC polygon(s).
+3. **`Extended Bounding Box` (`extent = "bbox"`):** Retrieves stream flowlines across the full rectangular bounding box of the watershed region.
+4. **`Buffered HUC Region` (`extent = "buffer"`):** Expands the stream retrieval zone outward by a user-defined distance (`1` to `25 km`, slider default: `5 km`).
 
-### 3. Composable Shiny Module Architecture
+### 3. Composable Shiny Module Architecture & Performance Optimizations
 
-- `streamsInput(id, mode = c("standalone", "sidebar"))`: Supports both standalone exploration and compact sidebar embedding with zero duplicated HTML or UI logic.
-- `streamsServer(id, map_proxy_id, watershed_sf, ...)`: Encapsulates all query fetching, proxy map rendering, and dynamic legend management, returning a clean reactive list (`$flowlines`, `$show_flowlines`, `$min_stream_order`, `$show_legend`, `$status`).
+- `streamsInput(id, mode = c("standalone", "sidebar"))`: Supports both standalone exploration and compact sidebar embedding with radio button controls and stream order sliders (default: `4`).
+- `streamsServer(id, map_proxy_id, watershed_sf, ...)`: Encapsulates query fetching, fast bounding-box remote queries, in-memory caching (`.watershed_flowline_cache`), two-stage local stream-order filtering (0 API calls on slider adjustments), proxy map rendering, and dynamic legend management.
 - `watershedApp.R`: Directly embeds `streamsInput()` and `streamsServer()`, consuming stream reactives with zero code duplication.

@@ -72,5 +72,6 @@ and discovers named geographical features within subwatersheds.
 Projects a mathematical hexagonal substrate grid overlay across an extracted watershed boundary.
 
 Queries the USGS National Hydrography Dataset (NHD) via `nhdplusTools` for stream
-flowlines intersecting a watershed boundary or geographic area.
+flowlines intersecting a watershed boundary or geographic area. Results are cached in
+memory to eliminate redundant network queries.
 }

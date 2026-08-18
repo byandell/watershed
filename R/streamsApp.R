@@ -168,39 +168,50 @@ streamsServer <- function(id,
         leaflet::setView(lng = default_lng, lat = default_lat, zoom = default_zoom)
     })
 
+    # Debounce slider inputs to prevent network thrashing during slider dragging
+    throttled_buffer_km <- shiny::reactive(input$stream_buffer_km) |> shiny::debounce(400)
+    throttled_min_order <- shiny::reactive(input$min_stream_order) |> shiny::debounce(200)
+
     # --- Mode 1: Embedded Watershed Synchronization (when watershed_sf is provided) ---
+    # Stage 1: Spatial Fetch Reactive
+    # Fetches un-thinned flowlines (min_stream_order = 1) from remote USGS or in-memory cache
+    # Only triggered when watershed boundary, stream extent, or buffer radius changes.
+    raw_flowlines_sf <- shiny::reactive({
+      if (is.null(watershed_sf) || !shiny::is.reactive(watershed_sf)) return(NULL)
+      w_sf <- watershed_sf()
+      ext <- if (!is.null(input$stream_extent)) input$stream_extent else "none"
+
+      if (ext == "none" || is.null(w_sf) || nrow(w_sf) == 0) {
+        return(NULL)
+      }
+
+      buf_km <- if (!is.null(throttled_buffer_km())) throttled_buffer_km() else 5
+      tryCatch(
+        get_watershed_flowlines(w_sf, min_stream_order = 1, extent = ext, buffer_km = buf_km),
+        error = function(e) NULL
+      )
+    })
+
+    # Stage 2: In-Memory Stream Order Filter Reactive
+    # Subsets the cached raw flowlines locally (0 API calls, instantaneous)
+    active_flowlines_sf <- shiny::reactive({
+      raw_fl <- raw_flowlines_sf()
+      if (is.null(raw_fl) || nrow(raw_fl) == 0) return(NULL)
+
+      min_ord <- if (!is.null(throttled_min_order())) throttled_min_order() else 4
+      if (is.numeric(min_ord) && min_ord > 1 && "streamorde" %in% names(raw_fl)) {
+        raw_fl[!is.na(raw_fl$streamorde) & raw_fl$streamorde >= min_ord, ]
+      } else {
+        raw_fl
+      }
+    })
+
+    # Stage 3: Map Proxy & Legend Synchronizer
     if (!is.null(watershed_sf) && shiny::is.reactive(watershed_sf)) {
-      shiny::observeEvent(list(watershed_sf(), input$stream_extent, input$stream_buffer_km, input$min_stream_order), {
-        w_sf <- watershed_sf()
+      shiny::observeEvent(list(active_flowlines_sf(), input$stream_extent), {
+        fl <- active_flowlines_sf()
         ext <- if (!is.null(input$stream_extent)) input$stream_extent else "none"
-
-        if (ext == "none" || is.null(w_sf) || nrow(w_sf) == 0) {
-          flowlines_sf(NULL)
-          if (!is.null(map_proxy_id)) {
-            proxy <- get_proxy() |>
-              leaflet::clearGroup("Stream Flowlines")
-
-            # Update legend when flowlines are hidden
-            is_hex <- if (!is.null(show_hex_reactive) && shiny::is.reactive(show_hex_reactive)) isTRUE(show_hex_reactive()) else TRUE
-            is_hab <- if (!is.null(show_habitat_reactive) && shiny::is.reactive(show_habitat_reactive)) isTRUE(show_habitat_reactive()) else TRUE
-            add_watershed_legend(
-              proxy,
-              show_hex = is_hex,
-              show_streams = FALSE,
-              show_habitat = is_hab,
-              show_legend = isTRUE(input$show_legend)
-            )
-          }
-          return()
-        }
-
-        buf_km <- if (!is.null(input$stream_buffer_km)) input$stream_buffer_km else 5
-        min_ord <- if (!is.null(input$min_stream_order)) input$min_stream_order else 4
-        
-        fl <- tryCatch(
-          get_watershed_flowlines(w_sf, min_stream_order = min_ord, extent = ext, buffer_km = buf_km),
-          error = function(e) NULL
-        )
+        has_streams <- (ext != "none" && !is.null(fl) && nrow(fl) > 0)
 
         flowlines_sf(fl)
 
@@ -208,7 +219,7 @@ streamsServer <- function(id,
           proxy <- get_proxy() |>
             leaflet::clearGroup("Stream Flowlines")
 
-          if (!is.null(fl) && nrow(fl) > 0) {
+          if (has_streams) {
             proxy <- proxy |> add_leaflet_flowlines(fl)
           }
 
@@ -218,7 +229,7 @@ streamsServer <- function(id,
           add_watershed_legend(
             proxy,
             show_hex = is_hex,
-            show_streams = TRUE,
+            show_streams = (ext != "none"),
             show_habitat = is_hab,
             show_legend = isTRUE(input$show_legend)
           )

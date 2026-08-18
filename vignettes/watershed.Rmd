@@ -111,11 +111,11 @@ The **`watershed`** R package was extracted from `ewing` into a standalone repos
 To maintain clean separation of concerns and achieve **zero code duplication**, stream extraction and legend management are implemented as a composable Shiny module in [`R/streamsApp.R`](../R/streamsApp.R) consumed directly by [`R/watershedApp.R`](../R/watershedApp.R):
 
 1. **Modular UI Component (`streamsInput(id, mode = c("standalone", "sidebar"))`)**:
-   - In `mode = "sidebar"`, renders compact sidebar controls (`show_flowlines`, `min_stream_order`, `show_legend`, and `clear_streams`) for clean embedding inside parent module UI (`watershedInput`).
+   - In `mode = "sidebar"`, renders compact sidebar controls (`stream_extent` radio buttons defaulting to `"none"`, `min_stream_order` defaulting to `4`, `show_legend`, and `clear_streams`) for clean embedding inside parent module UI (`watershedInput`).
    - In `mode = "standalone"`, renders full-page explorer controls including region selector dropdown (`rcode`), buffer radius slider, and dedicated map output (`stream_map`).
 
 2. **Modular Server Component (`streamsServer(id, map_proxy_id, watershed_sf, ...)`)**:
-   - Operates in embedded mode when `watershed_sf` and `map_proxy_id` are provided by `watershedServer`: observes the active HUC boundary, queries `get_watershed_flowlines()`, and directly updates the parent's Leaflet proxy and map legend.
+   - Operates in embedded mode when `watershed_sf` and `map_proxy_id` are provided by `watershedServer`: implements a two-stage reactive pipeline that queries `get_watershed_flowlines()` for full geometry, performs stream order filtering in memory (0 API calls on slider drag), and synchronizes Leaflet proxy layers and legends.
    - Operates in standalone mode when launched independently: manages map click events, queries StreamStats pour points, and renders catchments.
    - Returns a reactive list of outputs (`$flowlines`, `$show_flowlines`, `$min_stream_order`, `$show_legend`, `$status`) to parent callers.
 
@@ -124,9 +124,9 @@ To maintain clean separation of concerns and achieve **zero code duplication**, 
    - Added `add_leaflet_flowlines()` to render NHD flowlines weighted by stream order (`streamorde`) with clickable popups (stream names, orders, segment lengths).
    - Added `add_watershed_legend()` to render dynamic, color-coded map legends for active layers.
 
-4. **NHD Stream Flowline Extraction & Autoplot ([`R/watershed.R`](../R/watershed.R))**:
-   - Added `get_watershed_flowlines(watershed_obj, min_stream_order = 1, extent = c("huc", "bbox", "buffer"), buffer_km = 5)` to fetch NHD flowlines within any HUC boundary, bounding box, or buffered zone.
-   - **Defensive Multi-Feature Union:** Unifies input geometries (`sf::st_union`) prior to calling `nhdplusTools::get_nhdplus()` to prevent scalar `if (st_geometry_type(AOI) == "POINT")` vector length $>1$ runtime errors.
+4. **NHD Stream Flowline Extraction, In-Memory Caching & Autoplot ([`R/watershed.R`](../R/watershed.R))**:
+   - Added `get_watershed_flowlines(watershed_obj, min_stream_order = 1, extent = c("huc", "bbox", "buffer"), buffer_km = 5)` with in-memory caching (`.watershed_flowline_cache`) and fast bounding-box remote queries to eliminate redundant API requests.
+   - **Fast Envelope Query & Local Intersection:** Queries USGS using spatial bounding boxes, then clips to exact HUC geometries locally in R using `sf::st_intersects` under S2 hygiene.
    - Updated `autoplot.watershed_hex_overlay()` to render vector stream networks underneath the hexagonal mesh in static `ggplot2` plots.
 
 ### Empirical Verification Commands

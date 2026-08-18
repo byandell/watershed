@@ -158,15 +158,19 @@ The `watershed` package provides seamless visual and analytical stream modeling:
 - Provides a transparent, high-contrast overlay of all streams, rivers, canals, and lakes across the US without obscuring the base map.
 - Toggle between base maps (*CartoDB Positron*, *OpenStreetMap*, *Satellite Imagery*) and overlays using the Leaflet layer control in the top-right corner.
 
-### 2. Interactive NHD Stream Flowlines & User-Defined Extents
-- When **Overlay NHD Stream Flowlines** is enabled in `watershedApp()`, `watershed` automatically extracts vector stream flowlines via `nhdplusTools::get_nhdplus()` for the active HUC boundaries.
+### 2. Interactive NHD Stream Flowlines, In-Memory Caching & User-Defined Extents
+- When stream flowlines are enabled via the **Stream Flowline Extent** radio control in `watershedApp()`, `watershed` extracts vector stream flowlines via `nhdplusTools::get_nhdplus()` for the active HUC boundaries.
 - **Stream Extent Modes:**
-  - **`Constrained to HUC(s)` (`extent = "huc"`, default):** Restricts the flowline network strictly to the selected HUC boundary polygon(s).
+  - **`None` (`extent = "none"`, default):** Starts with no stream flowlines loaded for fast initial rendering and minimal network overhead.
+  - **`Constrained to HUC(s)` (`extent = "huc"`):** Restricts the flowline network strictly to the selected HUC boundary polygon(s).
   - **`Extended Bounding Box` (`extent = "bbox"`):** Fetches the broader regional river network across the full rectangular bounding box of the watershed region.
   - **`Buffered HUC Region` (`extent = "buffer"`):** Expands the stream retrieval zone outward by a user-defined distance (`1` to `25 km`, default: `5 km`).
-- **Strahler Stream Order Filtering:** Use the **Min Stream Order** slider (1 to 6) to filter flowlines by branching detail:
+- **High-Performance In-Memory Caching & Two-Stage Reactivity:**
+  - Remote flowline queries are cached in memory (`.watershed_flowline_cache`) by spatial bounding box, allowing instant toggling with **0 API calls**.
+  - Adjusting the **Min Stream Order** slider filters cached flowlines in memory instantly without making additional network requests.
+- **Strahler Stream Order Filtering:** Use the **Min Stream Order** slider (1 to 6, default: `4`) to filter flowlines by branching detail:
   - *Order 1–2:* Small headwater creeks and intermittent tributaries.
-  - *Order 3–4:* Medium-sized rivers and main stems.
+  - *Order 3–4:* Medium-sized rivers and main stems (default filter captures order 4+ for high-level structure).
   - *Order 5–6+:* Major continental rivers (e.g. Mississippi, Wisconsin, Ohio).
 - Line widths are automatically scaled by stream order, and clicking any stream polyline displays its GNIS name, order, and length.
 
