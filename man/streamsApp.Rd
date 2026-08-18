@@ -13,6 +13,7 @@ streamsServer(
   map_proxy_id = NULL,
   parent_session = NULL,
   watershed_sf = NULL,
+  huc_level = NULL,
   show_hex_reactive = NULL,
   show_habitat_reactive = NULL,
   default_lat = 43.0731,
@@ -33,6 +34,9 @@ or \code{"sidebar"} for embedded sidebar controls.}
 
 \item{watershed_sf}{Optional reactive expression returning an \code{sf} polygon object representing
 the active HUC watershed boundary. When supplied, flowlines are automatically queried and synchronized.}
+
+\item{huc_level}{Optional reactive expression returning the active numeric HUC level (e.g. 2, 4, 6, 8, 10, 12)
+to dynamically scale default stream order granularity.}
 
 \item{show_hex_reactive}{Optional reactive expression returning logical whether hex grid is active (for legend sync).}
 
