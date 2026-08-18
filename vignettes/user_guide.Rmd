@@ -168,16 +168,16 @@ The `watershed` package provides seamless visual and analytical stream modeling:
   - **`Constrained to HUC(s)` (`extent = "huc"`):** Restricts the flowline network strictly to the selected HUC boundary polygon(s).
   - **`Extended Bounding Box` (`extent = "bbox"`):** Fetches the broader regional river network across the full rectangular bounding box of the watershed region.
   - **`Buffered HUC Region` (`extent = "buffer"`):** Expands the stream retrieval zone outward by a user-defined distance (`1` to `25 km`, default: `5 km`).
-- **High-Performance Per-HUC In-Memory Caching & Two-Stage Reactivity:**
-  - Flowlines are cached at the individual HUC level (`.watershed_flowline_cache`). When composing multi-HUC regions, only newly added HUCs are fetched from USGS.
+- **High-Performance Per-HUC In-Memory Caching & Single-Batch Querying:**
+  - Multi-HUC regions query USGS in a **single unified bounding-box batch** ($1$ network request instead of $N$ sequential requests), caching individual HUC results in memory (`.watershed_flowline_cache`).
   - Removing a sub-watershed or deselecting a HUC drops its flowlines **instantly in memory with 0 network calls**. Deselecting all HUCs triggers immediate layer wipe.
   - Adjusting the **Min Stream Order** slider filters cached flowlines in memory instantly without making additional network requests.
-- **HUC-Adaptive Stream Order Scaling:** Stream order granularity automatically adapts to the active HUC level, passing `streamorder` directly to the USGS server to prevent heavy network payloads:
-  - **HUC 2 / 4 (Major Region):** Default **Order 5+** (Continental trunk rivers).
-  - **HUC 6 (River Basin):** Default **Order 4+** (Major river channels).
-  - **HUC 8 (Subbasin):** Default **Order 3+** (Named regional rivers).
-  - **HUC 10 (Watershed):** Default **Order 2+** (Branching tributaries).
-  - **HUC 12 (Subwatershed):** Default **Order 1+** (Detailed creeks and headwaters).
+- **Combined Bounding Box & HUC-Adaptive Stream Order Scaling:** Stream order granularity automatically adapts based on the total combined bounding box area ($\Delta x \times \Delta y$) and HUC level, passing `streamorder` directly to the USGS server:
+  - **Mega Regions ($> 3.5\text{ deg}^2$, e.g. HUC 2/4 or $15+$ HUCs):** Default **Order 5+** (Continental trunk rivers).
+  - **Large River Basins ($1.0 - 3.5\text{ deg}^2$, e.g. HUC 6 or $8-15$ HUCs):** Default **Order 4+** (Major river channels).
+  - **Subbasins ($0.25 - 1.0\text{ deg}^2$, e.g. HUC 8 or $4-8$ HUCs):** Default **Order 3+** (Named regional rivers).
+  - **Watersheds ($0.05 - 0.25\text{ deg}^2$, e.g. HUC 10):** Default **Order 2+** (Branching tributaries).
+  - **Local Subwatersheds ($< 0.05\text{ deg}^2$, e.g. HUC 12):** Default **Order 1+** (Detailed creeks and headwaters).
 - Line widths are automatically scaled by stream order, and clicking any stream polyline displays its GNIS name, order, and length.
 
 ### 3. Dynamic Map Legend

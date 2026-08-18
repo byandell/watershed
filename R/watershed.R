@@ -355,7 +355,32 @@ get_watershed_flowlines <- function(watershed_obj,
   
   aoi_4326 <- sf::st_transform(aoi, 4326)
   buf_dist <- if (!is.null(buffer_km) && is.numeric(buffer_km)) buffer_km else 5
-  query_order <- if (is.numeric(min_stream_order) && min_stream_order > 1) as.integer(min_stream_order) else NULL
+
+  # Compute total combined bounding box area across all selected HUCs
+  bb_all <- sf::st_bbox(aoi_4326)
+  dx_all <- max(as.numeric(bb_all["xmax"] - bb_all["xmin"]), 0.01)
+  dy_all <- max(as.numeric(bb_all["ymax"] - bb_all["ymin"]), 0.01)
+  total_area_deg2 <- dx_all * dy_all
+
+  # Adapt base minimum stream order based on the combined regional bounding box size
+  area_min_order <- if (total_area_deg2 > 3.5) {
+    5
+  } else if (total_area_deg2 > 1.0) {
+    4
+  } else if (total_area_deg2 > 0.25) {
+    3
+  } else if (total_area_deg2 > 0.05) {
+    2
+  } else {
+    1
+  }
+
+  effective_min_order <- if (is.numeric(min_stream_order)) {
+    max(as.integer(min_stream_order), area_min_order)
+  } else {
+    area_min_order
+  }
+  query_order <- if (effective_min_order > 1) effective_min_order else NULL
 
   # Determine if input sf contains identifiable HUC IDs for granular per-HUC caching
   huc_col <- NULL
@@ -368,7 +393,7 @@ get_watershed_flowlines <- function(watershed_obj,
     }
   }
 
-  # --- Branch A: Granular Per-HUC Caching ---
+  # --- Branch A: Granular Per-HUC Caching with Single-Batch Unified Querying ---
   if (!is.null(huc_col) && nrow(aoi_4326) > 0) {
     huc_ids <- as.character(aoi_4326[[huc_col]])
     
@@ -379,12 +404,10 @@ get_watershed_flowlines <- function(watershed_obj,
       hid <- huc_ids[i]
       h_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_%s", hid, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"), ifelse(is.null(query_order), "1", as.character(query_order)))
       
-      # Also check if a broader / finer order cache exists for this HUC
       found_cache <- NULL
       if (exists(h_key, envir = .watershed_flowline_cache, inherits = FALSE)) {
         found_cache <- get(h_key, envir = .watershed_flowline_cache, inherits = FALSE)
       } else {
-        # Check if an unconstrained order 1 cache exists
         h_base_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_1", hid, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"))
         if (exists(h_base_key, envir = .watershed_flowline_cache, inherits = FALSE)) {
           found_cache <- get(h_base_key, envir = .watershed_flowline_cache, inherits = FALSE)
@@ -398,51 +421,57 @@ get_watershed_flowlines <- function(watershed_obj,
       }
     }
     
-    # Query USGS with remote streamorder filter only for missing HUC geometries
+    # Query USGS in a single unified batch for all missing HUCs (1 network call instead of N sequential calls)
     if (length(missing_hucs) > 0) {
       missing_mask <- aoi_4326[[huc_col]] %in% missing_hucs
       missing_sf <- aoi_4326[missing_mask, ]
       
-      for (j in seq_len(nrow(missing_sf))) {
-        single_huc_sf <- missing_sf[j, ]
-        single_id <- as.character(single_huc_sf[[huc_col]])
-        h_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_%s", single_id, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"), ifelse(is.null(query_order), "1", as.character(query_order)))
-        
-        single_union <- suppressWarnings(sf::st_union(single_huc_sf))
-        single_bb <- sf::st_bbox(single_huc_sf)
-        
-        q_aoi <- if (extent == "bbox") {
-          sf::st_as_sfc(single_bb)
-        } else if (extent == "buffer") {
-          suppressWarnings(sf::st_transform(sf::st_buffer(sf::st_transform(single_union, 5070), buf_dist * 1000), 4326))
-        } else {
-          single_union
+      missing_union <- suppressWarnings(sf::st_union(missing_sf))
+      q_missing_aoi <- if (extent == "bbox") {
+        sf::st_as_sfc(sf::st_bbox(missing_sf))
+      } else if (extent == "buffer") {
+        suppressWarnings(sf::st_transform(sf::st_buffer(sf::st_transform(missing_union, 5070), buf_dist * 1000), 4326))
+      } else {
+        missing_union
+      }
+      
+      q_envelope <- sf::st_as_sfc(sf::st_bbox(q_missing_aoi))
+      
+      fl_batch <- tryCatch({
+        nhdplusTools::get_nhdplus(AOI = q_envelope, streamorder = query_order, realization = "flowline")
+      }, error = function(e) NULL)
+      
+      if (!is.null(fl_batch) && inherits(fl_batch, "sf") && nrow(fl_batch) > 0) {
+        fl_batch <- sf::st_transform(fl_batch, 4326)
+        keep_cols <- intersect(c("comid", "gnis_name", "lengthkm", "streamorde", attr(fl_batch, "sf_column")), names(fl_batch))
+        if (length(keep_cols) > 0) {
+          fl_batch <- fl_batch[, keep_cols, drop = FALSE]
         }
         
-        q_envelope <- sf::st_as_sfc(sf::st_bbox(q_aoi))
-        
-        # Pass streamorder to USGS API to filter line features before transfer
-        fl_single <- tryCatch({
-          nhdplusTools::get_nhdplus(AOI = q_envelope, streamorder = query_order, realization = "flowline")
-        }, error = function(e) NULL)
-        
-        if (!is.null(fl_single) && inherits(fl_single, "sf") && nrow(fl_single) > 0) {
-          fl_single <- sf::st_transform(fl_single, 4326)
-          keep_cols <- intersect(c("comid", "gnis_name", "lengthkm", "streamorde", attr(fl_single, "sf_column")), names(fl_single))
-          if (length(keep_cols) > 0) {
-            fl_single <- fl_single[, keep_cols, drop = FALSE]
+        old_s2 <- suppressMessages(sf::sf_use_s2(FALSE))
+        for (j in seq_len(nrow(missing_sf))) {
+          single_huc_sf <- missing_sf[j, ]
+          single_id <- as.character(single_huc_sf[[huc_col]])
+          h_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_%s", single_id, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"), ifelse(is.null(query_order), "1", as.character(query_order)))
+          
+          target_geom <- if (extent == "buffer") {
+            suppressWarnings(sf::st_transform(sf::st_buffer(sf::st_transform(single_huc_sf, 5070), buf_dist * 1000), 4326))
+          } else if (extent == "bbox") {
+            sf::st_as_sfc(sf::st_bbox(single_huc_sf))
+          } else {
+            single_huc_sf
           }
           
-          if (extent %in% c("huc", "buffer")) {
-            old_s2 <- suppressMessages(sf::sf_use_s2(FALSE))
-            inter <- suppressWarnings(lengths(sf::st_intersects(fl_single, q_aoi)) > 0)
-            suppressMessages(sf::sf_use_s2(old_s2))
-            fl_single <- fl_single[inter, ]
-          }
-          
+          inter <- suppressWarnings(lengths(sf::st_intersects(fl_batch, target_geom)) > 0)
+          fl_single <- fl_batch[inter, ]
           assign(h_key, fl_single, envir = .watershed_flowline_cache)
           if (nrow(fl_single) > 0) cached_list[[single_id]] <- fl_single
-        } else {
+        }
+        suppressMessages(sf::sf_use_s2(old_s2))
+      } else {
+        for (j in seq_len(nrow(missing_sf))) {
+          single_id <- as.character(missing_sf[[huc_col]][j])
+          h_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_%s", single_id, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"), ifelse(is.null(query_order), "1", as.character(query_order)))
           assign(h_key, NULL, envir = .watershed_flowline_cache)
         }
       }
@@ -456,8 +485,8 @@ get_watershed_flowlines <- function(watershed_obj,
       if ("comid" %in% names(combined_fl)) {
         combined_fl <- combined_fl[!duplicated(combined_fl$comid), ]
       }
-      if (is.numeric(min_stream_order) && min_stream_order > 1 && "streamorde" %in% names(combined_fl)) {
-        combined_fl <- combined_fl[!is.na(combined_fl$streamorde) & combined_fl$streamorde >= min_stream_order, ]
+      if (is.numeric(effective_min_order) && effective_min_order > 1 && "streamorde" %in% names(combined_fl)) {
+        combined_fl <- combined_fl[!is.na(combined_fl$streamorde) & combined_fl$streamorde >= effective_min_order, ]
       }
       return(combined_fl)
     }

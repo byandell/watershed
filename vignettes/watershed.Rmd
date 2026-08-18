@@ -126,8 +126,8 @@ To maintain clean separation of concerns and achieve **zero code duplication**, 
    - Added `add_watershed_legend()` to render dynamic, color-coded map legends for active layers.
 
 4. **NHD Stream Flowline Extraction, Per-HUC Caching & Autoplot ([`R/watershed.R`](../R/watershed.R))**:
-   - Added `get_watershed_flowlines(watershed_obj, min_stream_order = 1, extent = c("huc", "bbox", "buffer"), buffer_km = 5)` with granular per-HUC caching (`.watershed_flowline_cache`), remote `streamorder` query filtering, and fast bounding-box queries.
-   - **HUC-Adaptive Granularity & Fast Server Filtering:** Passes `streamorder` directly to `nhdplusTools::get_nhdplus()` to cut network transfer times by 70–85% for coarse HUC levels (e.g. HUC 4/6/8).
+   - Added `get_watershed_flowlines(watershed_obj, min_stream_order = 1, extent = c("huc", "bbox", "buffer"), buffer_km = 5)` with granular per-HUC caching (`.watershed_flowline_cache`), combined bounding-box area scaling ($\Delta x \times \Delta y$), remote `streamorder` query filtering, and single-batch multi-HUC queries ($1$ network request instead of $N$).
+   - **Combined Bounding Box & HUC Scaling:** Calculates total regional bounding box area to adaptively set stream order (order 5 for mega regions $> 3.5\text{ deg}^2$, order 4 for river basins $> 1.0\text{ deg}^2$, order 3 for subbasins $> 0.25\text{ deg}^2$).
    - **Instant Sub-Watershed Removal:** Decomposing or unselecting individual HUCs reuses cached flowlines without making network calls ($0$ API calls, $0$ ms wait).
    - **Fast Envelope Query & Local Intersection:** Queries USGS using spatial bounding boxes, then clips to exact HUC geometries locally in R using `sf::st_intersects` under S2 hygiene.
    - Updated `autoplot.watershed_hex_overlay()` to render vector stream networks underneath the hexagonal mesh in static `ggplot2` plots.
