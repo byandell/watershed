@@ -610,5 +610,5 @@ Four user-selectable extent modes are supported via radio button controls:
 ### 3. Composable Shiny Module Architecture & Performance Optimizations
 
 - `streamsInput(id, mode = c("standalone", "sidebar"))`: Supports both standalone exploration and compact sidebar embedding with radio button controls and stream order sliders (default: `4`).
-- `streamsServer(id, map_proxy_id, watershed_sf, ...)`: Encapsulates query fetching, fast bounding-box remote queries, in-memory caching (`.watershed_flowline_cache`), two-stage local stream-order filtering (0 API calls on slider adjustments), proxy map rendering, and dynamic legend management.
-- `watershedApp.R`: Directly embeds `streamsInput()` and `streamsServer()`, consuming stream reactives with zero code duplication.
+- `streamsServer(id, map_proxy_id, watershed_sf, ...)`: Encapsulates query fetching, fast bounding-box remote queries, granular per-HUC in-memory caching (`.watershed_flowline_cache`), instant sub-watershed removal ($0$ API calls), two-stage local stream-order filtering (0 API calls on slider adjustments), proxy map rendering, and dynamic legend management.
+- `watershedApp.R`: Directly embeds `streamsInput()` and `streamsServer()`, consuming stream reactives with zero code duplication and instant non-blocking layer clearing.

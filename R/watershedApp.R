@@ -213,19 +213,22 @@ watershedServer <- function(id) {
       ignoreInit = TRUE
     )
 
-    # Debounce HUC selector inputs to avoid unnecessary processing
-    throttled_huc_id <- shiny::reactive(input$huc12_id) |> shiny::debounce(1000)
+    # Debounce HUC selector inputs only when needed for typing network fetches
+    throttled_huc_id <- shiny::reactive(input$huc12_id) |> shiny::debounce(600)
 
-    # Base geography cache reactive: Filters from in-memory sf data if available (0 API calls), otherwise fetches
+    # Base geography reactive: Resolves in-memory geometries instantly (0 ms, 0 API calls),
+    # explicitly returns NULL when cleared so downstream layers (streams, habitat) wipe immediately.
     base_huc <- shiny::reactive({
-      huc_vec <- throttled_huc_id()
-      shiny::req(huc_vec)
-      huc_vec <- huc_vec[huc_vec != ""]
-      shiny::req(length(huc_vec) > 0)
+      raw_huc_vec <- input$huc12_id
+      if (is.null(raw_huc_vec) || length(raw_huc_vec) == 0 || all(raw_huc_vec == "")) {
+        return(NULL)
+      }
+      raw_huc_vec <- raw_huc_vec[raw_huc_vec != ""]
+      if (length(raw_huc_vec) == 0) return(NULL)
 
       all_sf <- leaflet_mod$all_hucs()
 
-      # Zero-API-Call Cache: If candidate HUC geometries exist in memory, filter locally!
+      # Zero-Latency In-Memory Cache: When candidate HUCs exist in memory, filter immediately!
       if (!is.null(all_sf) && nrow(all_sf) > 0) {
         huc_col <- NULL
         for (c in c("huc16", "huc14", "huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
@@ -233,12 +236,19 @@ watershedServer <- function(id) {
         }
         if (is.null(huc_col)) huc_col <- names(all_sf)[1]
         mem_ids <- as.character(all_sf[[huc_col]])
-        if (all(huc_vec %in% mem_ids)) {
-          return(all_sf[mem_ids %in% huc_vec, ])
+        if (all(raw_huc_vec %in% mem_ids)) {
+          return(all_sf[mem_ids %in% raw_huc_vec, ])
         }
       }
 
-      # Fallback to network fetch only for newly typed/un-cached HUC IDs
+      # Fallback to network fetch only for newly typed/un-cached HUC IDs (debounced)
+      huc_vec <- throttled_huc_id()
+      if (is.null(huc_vec) || length(huc_vec) == 0 || all(huc_vec == "")) {
+        return(NULL)
+      }
+      huc_vec <- huc_vec[huc_vec != ""]
+      if (length(huc_vec) == 0) return(NULL)
+
       res <- NULL
       shiny::withProgress(message = "Fetching USGS Base Boundary...", value = 0.3, {
         res <- tryCatch(

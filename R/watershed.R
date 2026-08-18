@@ -354,10 +354,109 @@ get_watershed_flowlines <- function(watershed_obj,
   if (is.null(aoi) || nrow(aoi) == 0) return(NULL)
   
   aoi_4326 <- sf::st_transform(aoi, 4326)
+  buf_dist <- if (!is.null(buffer_km) && is.numeric(buffer_km)) buffer_km else 5
+
+  # Determine if input sf contains identifiable HUC IDs for granular per-HUC caching
+  huc_col <- NULL
+  if (inherits(aoi_4326, "sf") || inherits(aoi_4326, "data.frame")) {
+    for (c in c("huc16", "huc14", "huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
+      if (c %in% names(aoi_4326)) {
+        huc_col <- c
+        break
+      }
+    }
+  }
+
+  # --- Branch A: Granular Per-HUC Caching ---
+  if (!is.null(huc_col) && nrow(aoi_4326) > 0) {
+    huc_ids <- as.character(aoi_4326[[huc_col]])
+    
+    # Check which HUCs are already cached in memory
+    cached_list <- list()
+    missing_hucs <- character(0)
+    
+    for (i in seq_along(huc_ids)) {
+      hid <- huc_ids[i]
+      h_key <- sprintf("huc_%s_ext_%s_buf_%s", hid, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"))
+      
+      if (exists(h_key, envir = .watershed_flowline_cache, inherits = FALSE)) {
+        fl_cached <- get(h_key, envir = .watershed_flowline_cache, inherits = FALSE)
+        if (!is.null(fl_cached) && inherits(fl_cached, "sf") && nrow(fl_cached) > 0) {
+          cached_list[[hid]] <- fl_cached
+        }
+      } else {
+        missing_hucs <- c(missing_hucs, hid)
+      }
+    }
+    
+    # Query USGS only for missing HUC geometries
+    if (length(missing_hucs) > 0) {
+      missing_mask <- aoi_4326[[huc_col]] %in% missing_hucs
+      missing_sf <- aoi_4326[missing_mask, ]
+      
+      for (j in seq_len(nrow(missing_sf))) {
+        single_huc_sf <- missing_sf[j, ]
+        single_id <- as.character(single_huc_sf[[huc_col]])
+        h_key <- sprintf("huc_%s_ext_%s_buf_%s", single_id, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"))
+        
+        single_union <- suppressWarnings(sf::st_union(single_huc_sf))
+        single_bb <- sf::st_bbox(single_huc_sf)
+        
+        q_aoi <- if (extent == "bbox") {
+          sf::st_as_sfc(single_bb)
+        } else if (extent == "buffer") {
+          suppressWarnings(sf::st_transform(sf::st_buffer(sf::st_transform(single_union, 5070), buf_dist * 1000), 4326))
+        } else {
+          single_union
+        }
+        
+        q_envelope <- sf::st_as_sfc(sf::st_bbox(q_aoi))
+        
+        fl_single <- tryCatch({
+          nhdplusTools::get_nhdplus(AOI = q_envelope, realization = "flowline")
+        }, error = function(e) NULL)
+        
+        if (!is.null(fl_single) && inherits(fl_single, "sf") && nrow(fl_single) > 0) {
+          fl_single <- sf::st_transform(fl_single, 4326)
+          keep_cols <- intersect(c("comid", "gnis_name", "lengthkm", "streamorde", attr(fl_single, "sf_column")), names(fl_single))
+          if (length(keep_cols) > 0) {
+            fl_single <- fl_single[, keep_cols, drop = FALSE]
+          }
+          
+          if (extent %in% c("huc", "buffer")) {
+            old_s2 <- suppressMessages(sf::sf_use_s2(FALSE))
+            inter <- suppressWarnings(lengths(sf::st_intersects(fl_single, q_aoi)) > 0)
+            suppressMessages(sf::sf_use_s2(old_s2))
+            fl_single <- fl_single[inter, ]
+          }
+          
+          assign(h_key, fl_single, envir = .watershed_flowline_cache)
+          if (nrow(fl_single) > 0) cached_list[[single_id]] <- fl_single
+        } else {
+          assign(h_key, NULL, envir = .watershed_flowline_cache)
+        }
+      }
+    }
+    
+    if (length(cached_list) == 0) return(NULL)
+    
+    # Combine all individual HUC flowlines in memory
+    combined_fl <- do.call(rbind, cached_list)
+    if (!is.null(combined_fl) && inherits(combined_fl, "sf") && nrow(combined_fl) > 0) {
+      if ("comid" %in% names(combined_fl)) {
+        combined_fl <- combined_fl[!duplicated(combined_fl$comid), ]
+      }
+      if (is.numeric(min_stream_order) && min_stream_order > 1 && "streamorde" %in% names(combined_fl)) {
+        combined_fl <- combined_fl[!is.na(combined_fl$streamorde) & combined_fl$streamorde >= min_stream_order, ]
+      }
+      return(combined_fl)
+    }
+    return(NULL)
+  }
+
+  # --- Branch B: Generic Shape / Bounding-Box Cache Fallback ---
   aoi_union <- suppressWarnings(sf::st_union(aoi_4326))
   bb <- sf::st_bbox(aoi_4326)
-  
-  buf_dist <- if (!is.null(buffer_km) && is.numeric(buffer_km)) buffer_km else 5
   cache_key <- sprintf(
     "ext_%s_buf_%s_bb_%.4f_%.4f_%.4f_%.4f",
     extent,
@@ -365,16 +464,14 @@ get_watershed_flowlines <- function(watershed_obj,
     bb["xmin"], bb["ymin"], bb["xmax"], bb["ymax"]
   )
 
-  # Check in-memory session cache (0 API calls)
   if (exists(cache_key, envir = .watershed_flowline_cache, inherits = FALSE)) {
     cached_fl <- get(cache_key, envir = .watershed_flowline_cache, inherits = FALSE)
-    if (!is.null(cached_fl) && nrow(cached_fl) > 0 && is.numeric(min_stream_order) && min_stream_order > 1 && "streamorde" %in% names(cached_fl)) {
+    if (!is.null(cached_fl) && inherits(cached_fl, "sf") && nrow(cached_fl) > 0 && is.numeric(min_stream_order) && min_stream_order > 1 && "streamorde" %in% names(cached_fl)) {
       return(cached_fl[!is.na(cached_fl$streamorde) & cached_fl$streamorde >= min_stream_order, ])
     }
     return(cached_fl)
   }
   
-  # Ensure query target geometry is formed
   query_aoi <- if (extent == "bbox") {
     sf::st_as_sfc(bb)
   } else if (extent == "buffer") {
@@ -383,7 +480,6 @@ get_watershed_flowlines <- function(watershed_obj,
     aoi_union
   }
   
-  # Optimization: Query remote API by bounding box envelope (substantially faster than complex multi-polygons)
   query_envelope <- sf::st_as_sfc(sf::st_bbox(query_aoi))
   
   flowlines <- tryCatch({
@@ -393,20 +489,18 @@ get_watershed_flowlines <- function(watershed_obj,
     NULL
   })
   
-  if (is.null(flowlines) || nrow(flowlines) == 0) {
+  if (is.null(flowlines) || !inherits(flowlines, "sf") || nrow(flowlines) == 0) {
     assign(cache_key, NULL, envir = .watershed_flowline_cache)
     return(NULL)
   }
   
   flowlines <- sf::st_transform(flowlines, 4326)
   
-  # Retain only necessary columns for map rendering & attribute display
   keep_cols <- intersect(c("comid", "gnis_name", "lengthkm", "streamorde", attr(flowlines, "sf_column")), names(flowlines))
   if (length(keep_cols) > 0) {
     flowlines <- flowlines[, keep_cols, drop = FALSE]
   }
   
-  # Spatial clipping to exact target geometry
   if (extent %in% c("huc", "buffer")) {
     old_s2 <- suppressMessages(sf::sf_use_s2(FALSE))
     inter <- suppressWarnings(lengths(sf::st_intersects(flowlines, query_aoi)) > 0)
@@ -414,7 +508,6 @@ get_watershed_flowlines <- function(watershed_obj,
     flowlines <- flowlines[inter, ]
   }
   
-  # Cache the full un-thinned flowline sf object for this AOI and extent
   assign(cache_key, flowlines, envir = .watershed_flowline_cache)
   
   if (is.numeric(min_stream_order) && min_stream_order > 1 && "streamorde" %in% names(flowlines)) {

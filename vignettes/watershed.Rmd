@@ -124,8 +124,9 @@ To maintain clean separation of concerns and achieve **zero code duplication**, 
    - Added `add_leaflet_flowlines()` to render NHD flowlines weighted by stream order (`streamorde`) with clickable popups (stream names, orders, segment lengths).
    - Added `add_watershed_legend()` to render dynamic, color-coded map legends for active layers.
 
-4. **NHD Stream Flowline Extraction, In-Memory Caching & Autoplot ([`R/watershed.R`](../R/watershed.R))**:
-   - Added `get_watershed_flowlines(watershed_obj, min_stream_order = 1, extent = c("huc", "bbox", "buffer"), buffer_km = 5)` with in-memory caching (`.watershed_flowline_cache`) and fast bounding-box remote queries to eliminate redundant API requests.
+4. **NHD Stream Flowline Extraction, Per-HUC Caching & Autoplot ([`R/watershed.R`](../R/watershed.R))**:
+   - Added `get_watershed_flowlines(watershed_obj, min_stream_order = 1, extent = c("huc", "bbox", "buffer"), buffer_km = 5)` with granular per-HUC caching (`.watershed_flowline_cache`) and fast bounding-box remote queries.
+   - **Instant Sub-Watershed Removal:** Decomposing or unselecting individual HUCs reuses cached flowlines without making network calls ($0$ API calls, $0$ ms wait).
    - **Fast Envelope Query & Local Intersection:** Queries USGS using spatial bounding boxes, then clips to exact HUC geometries locally in R using `sf::st_intersects` under S2 hygiene.
    - Updated `autoplot.watershed_hex_overlay()` to render vector stream networks underneath the hexagonal mesh in static `ggplot2` plots.
 

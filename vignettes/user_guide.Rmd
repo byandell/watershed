@@ -165,8 +165,9 @@ The `watershed` package provides seamless visual and analytical stream modeling:
   - **`Constrained to HUC(s)` (`extent = "huc"`):** Restricts the flowline network strictly to the selected HUC boundary polygon(s).
   - **`Extended Bounding Box` (`extent = "bbox"`):** Fetches the broader regional river network across the full rectangular bounding box of the watershed region.
   - **`Buffered HUC Region` (`extent = "buffer"`):** Expands the stream retrieval zone outward by a user-defined distance (`1` to `25 km`, default: `5 km`).
-- **High-Performance In-Memory Caching & Two-Stage Reactivity:**
-  - Remote flowline queries are cached in memory (`.watershed_flowline_cache`) by spatial bounding box, allowing instant toggling with **0 API calls**.
+- **High-Performance Per-HUC In-Memory Caching & Two-Stage Reactivity:**
+  - Flowlines are cached at the individual HUC level (`.watershed_flowline_cache`). When composing multi-HUC regions, only newly added HUCs are fetched from USGS.
+  - Removing a sub-watershed or deselecting a HUC drops its flowlines **instantly in memory with 0 network calls**. Deselecting all HUCs triggers immediate layer wipe.
   - Adjusting the **Min Stream Order** slider filters cached flowlines in memory instantly without making additional network requests.
 - **Strahler Stream Order Filtering:** Use the **Min Stream Order** slider (1 to 6, default: `4`) to filter flowlines by branching detail:
   - *Order 1–2:* Small headwater creeks and intermittent tributaries.
