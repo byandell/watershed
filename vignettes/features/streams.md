@@ -583,3 +583,31 @@ map <- leaflet() |>
 app <- streamsApp()
 # Output: SUCCESS (shiny.appobj)
 ```
+
+---
+
+## Part 3: Shiny Module Composition, Scalar Check Fix & User-Defined Stream Extents
+
+### 1. Root Cause & Resolution of Scalar Geometry Check Warning
+
+When `nhdplusTools::get_nhdplus(AOI = ...)` was passed a multi-feature `sf` or `sfc` object (such as multi-row HUC collections), its internal scalar test (`if (st_geometry_type(AOI) == "POINT")`) failed with:
+```
+Warning in value[[3L]](cond) : Failed to retrieve NHD stream flowlines: the condition has length > 1
+```
+
+**Resolution:**
+- `get_watershed_flowlines()` computes `aoi_union <- suppressWarnings(sf::st_union(aoi_4326))`, ensuring `AOI` is always passed as a single unified polygon geometry to `nhdplusTools`.
+- Spatial intersection filtering (`sf::st_intersects(flowlines, aoi_union)`) is applied when constrained to HUCs.
+
+### 2. User-Defined Stream Extent Selection (`R/streamsApp.R` & `R/watershed.R`)
+
+Added three user-selectable extent modes:
+1. **`Constrained to HUC(s)` (`extent = "huc"`, Default):** Clips the stream flowlines strictly to the selected HUC boundary polygon(s).
+2. **`Extended Bounding Box` (`extent = "bbox"`):** Retrieves all stream flowlines within the rectangular bounding box of the watershed region.
+3. **`Buffered HUC Region` (`extent = "buffer"`):** Expands the stream retrieval zone outward by a user-defined distance (`1` to `25 km`, slider default: `5 km`).
+
+### 3. Composable Shiny Module Architecture
+
+- `streamsInput(id, mode = c("standalone", "sidebar"))`: Supports both standalone exploration and compact sidebar embedding with zero duplicated HTML or UI logic.
+- `streamsServer(id, map_proxy_id, watershed_sf, ...)`: Encapsulates all query fetching, proxy map rendering, and dynamic legend management, returning a clean reactive list (`$flowlines`, `$show_flowlines`, `$min_stream_order`, `$show_legend`, `$status`).
+- `watershedApp.R`: Directly embeds `streamsInput()` and `streamsServer()`, consuming stream reactives with zero code duplication.

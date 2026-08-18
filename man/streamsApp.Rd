@@ -4,12 +4,16 @@
 \alias{streamsInput}
 \alias{streamsServer}
 \alias{streamsApp}
-\title{UI Component for StreamStats Leaflet Explorer}
+\title{UI Component for StreamStats & Hydrography Leaflet Explorer}
 \usage{
-streamsInput(id)
+streamsInput(id, mode = c("standalone", "sidebar"))
 
 streamsServer(
   id,
+  map_proxy_id = NULL,
+  watershed_sf = NULL,
+  show_hex_reactive = NULL,
+  show_habitat_reactive = NULL,
   default_lat = 43.0731,
   default_lng = -89.4012,
   default_zoom = 9
@@ -20,16 +24,38 @@ streamsApp()
 \arguments{
 \item{id}{Shiny module ID}
 
+\item{mode}{Character string specifying layout mode: \code{"standalone"} (default) for full map page,
+or \code{"sidebar"} for embedded sidebar controls.}
+
+\item{map_proxy_id}{Optional character string specifying a parent module's leafletProxy handle
+(e.g., \code{session$ns("map-mapper")}). When provided, stream flowlines and legends render to this proxy.}
+
+\item{watershed_sf}{Optional reactive expression returning an \code{sf} polygon object representing
+the active HUC watershed boundary. When supplied, flowlines are automatically queried and synchronized.}
+
+\item{show_hex_reactive}{Optional reactive expression returning logical whether hex grid is active (for legend sync).}
+
+\item{show_habitat_reactive}{Optional reactive expression returning logical whether habitat is active (for legend sync).}
+
 \item{default_lat}{Initial latitude for the map view (default: 43.0731)}
 
 \item{default_lng}{Initial longitude for the map view (default: -89.4012)}
 
 \item{default_zoom}{Initial map zoom level (default: 9)}
 }
+\value{
+A list of reactive expressions:
+  \item{flowlines}{Reactive value holding the extracted NHD stream flowlines \code{sf} object (or \code{NULL}).}
+  \item{show_flowlines}{Reactive expression returning whether flowlines overlay is enabled.}
+  \item{min_stream_order}{Reactive expression returning the minimum Strahler stream order filter.}
+  \item{show_legend}{Reactive expression returning whether map legend display is enabled.}
+  \item{status}{Reactive value holding HTML status update messages.}
+}
 \description{
-UI Component for StreamStats Leaflet Explorer
+Modular UI component supporting both standalone exploration and embedded sidebar controls
+within parent applications (such as \code{watershedApp}).
 
-Server Logic for StreamStats Leaflet Explorer
-
-Run the Standalone StreamStats Explorer App
+Server module managing USGS StreamStats point delineation, NHD stream flowline extraction,
+and dynamic Leaflet map layer rendering. Supports standalone operation and embedded module
+composition within parent modules (such as \code{watershedServer}).
 }

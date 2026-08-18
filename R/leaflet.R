@@ -15,9 +15,17 @@ build_base_map <- function() {
     stop("Packages 'leaflet' and 'leaflet.extras' are required for building the interactive mapper.")
   }
   
-  # Initialize the map centered near central North America
+  # Initialize the map centered near central North America with multi-layer basemap options
   map <- leaflet::leaflet() |>
-    leaflet::addTiles(group = "OpenStreetMap")
+    leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron, group = "CartoDB Positron") |>
+    leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap") |>
+    leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite Imagery") |>
+    add_usgs_hydro_layer(group = "USGS Hydrography (Streams)") |>
+    leaflet::addLayersControl(
+      baseGroups = c("CartoDB Positron", "OpenStreetMap", "Satellite Imagery"),
+      overlayGroups = c("USGS Hydrography (Streams)", "Drawn Region", "huc_polygons", "Stream Flowlines", "StreamStats Basin", "Hex Overlay", "Habitat Overlay", "Landmarks"),
+      options = leaflet::layersControlOptions(collapsed = TRUE)
+    )
   
   # Embed the OpenStreetMap search bar widget
   map <- leaflet.extras::addSearchOSM(
@@ -336,3 +344,86 @@ add_leaflet_hex_overlay <- function(map, hex_obj, hex_color = "#7F8C8D", bound_c
   
   return(map)
 }
+
+#' Add NHD Stream Flowlines Overlay to Leaflet Map
+#'
+#' @param map A `leaflet` map object or `leafletProxy` handle.
+#' @param flowlines An `sf` data frame containing LINESTRING geometries of stream flowlines.
+#' @param stream_color Stroke color for flowlines (default: "#0055ff").
+#' @param group Group name for layer controls (default: "Stream Flowlines").
+#' @return Updated `leaflet` map object.
+#' @export
+#' @rdname leaflet
+add_leaflet_flowlines <- function(map, flowlines, stream_color = "#0055ff", group = "Stream Flowlines") {
+  if (is.null(flowlines) || !inherits(flowlines, "sf") || nrow(flowlines) == 0) return(map)
+  
+  geom_types <- as.character(sf::st_geometry_type(flowlines))
+  if (!any(c("LINESTRING", "MULTILINESTRING") %in% geom_types)) return(map)
+  
+  flowlines_4326 <- sf::st_transform(flowlines, 4326)
+  
+  line_weights <- if ("streamorde" %in% names(flowlines_4326)) {
+    pmax(as.numeric(flowlines_4326$streamorde) * 1.2, 2)
+  } else {
+    2.5
+  }
+  
+  stream_names <- if ("gnis_name" %in% names(flowlines_4326)) {
+    ifelse(is.na(flowlines_4326$gnis_name) | flowlines_4326$gnis_name == " ", "Unnamed Stream / Flowline", flowlines_4326$gnis_name)
+  } else {
+    rep("Stream / Flowline", nrow(flowlines_4326))
+  }
+  
+  orders <- if ("streamorde" %in% names(flowlines_4326)) flowlines_4326$streamorde else rep(1, nrow(flowlines_4326))
+  lengths <- if ("lengthkm" %in% names(flowlines_4326)) sprintf("%.2f km", flowlines_4326$lengthkm) else ""
+  
+  popups <- sprintf("<b>Stream:</b> %s<br/><b>Stream Order:</b> %s<br/><b>Length:</b> %s", stream_names, orders, lengths)
+  
+  map |>
+    leaflet::addPolylines(
+      data = flowlines_4326,
+      color = stream_color,
+      weight = line_weights,
+      opacity = 0.9,
+      popup = popups,
+      group = group
+    )
+}
+
+#' Add Dynamic Hydrology & Watershed Legend to Leaflet
+#'
+#' @param map A `leaflet` map object or `leafletProxy` handle.
+#' @param show_hex Logical. Include hex grid in legend.
+#' @param show_streams Logical. Include stream flowlines in legend.
+#' @param show_habitat Logical. Include habitat/landmarks in legend.
+#' @param show_legend Logical. Whether to show or remove legend.
+#' @param position Position on map (default: "bottomright").
+#' @return Updated `leaflet` map object.
+#' @export
+#' @rdname leaflet
+add_watershed_legend <- function(map,
+                                 show_hex = TRUE,
+                                 show_streams = TRUE,
+                                 show_habitat = TRUE,
+                                 show_legend = TRUE,
+                                 position = "bottomright") {
+  if (!isTRUE(show_legend)) {
+    return(leaflet::removeControl(map, "watershed_legend"))
+  }
+  
+  colors <- c("#8E44AD", "#0055ff", "#27AE60", "#7F8C8D")
+  labels <- c("Selected HUC Boundary", "Stream Flowlines (NHD)", "Habitat / Landmarks", "Hex Mesh Cells")
+  active <- c(TRUE, isTRUE(show_streams), isTRUE(show_habitat), isTRUE(show_hex))
+  
+  map |>
+    leaflet::removeControl("watershed_legend") |>
+    leaflet::addLegend(
+      position = position,
+      colors = colors[active],
+      labels = labels[active],
+      title = "Watershed Layers",
+      opacity = 0.85,
+      layerId = "watershed_legend"
+    )
+}
+

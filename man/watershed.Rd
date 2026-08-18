@@ -6,6 +6,7 @@
 \alias{add_watershed_hex_overlay}
 \alias{autoplot.watershed_hex_overlay}
 \alias{discover_watershed_features}
+\alias{get_watershed_flowlines}
 \title{Watershed Boundary & Hexagonal Substrate Utilities}
 \usage{
 get_watershed(huc_id, feature_name = NULL, huc_layer = NULL)
@@ -17,6 +18,13 @@ add_watershed_hex_overlay(huc_info, hex_diameter = 0.01)
 discover_watershed_features(
   huc_id,
   feature_types = c("natural", "waterway", "leisure")
+)
+
+get_watershed_flowlines(
+  watershed_obj,
+  min_stream_order = 1,
+  extent = c("huc", "bbox", "buffer"),
+  buffer_km = 5
 )
 }
 \arguments{
@@ -35,6 +43,15 @@ discover_watershed_features(
 \item{...}{Additional arguments passed to plotting functions.}
 
 \item{feature_types}{A character vector of OSM keys to query (default: c("natural", "waterway", "leisure")).}
+
+\item{watershed_obj}{A `watershed` S3 object or an `sf` polygon object.}
+
+\item{min_stream_order}{Minimum Strahler stream order to include (default: 1).}
+
+\item{extent}{Character string specifying extent mode: \code{"huc"} (default, strictly constrained
+to HUC boundary), \code{"bbox"} (bounding box area of watershed), or \code{"buffer"} (buffered region around HUC).}
+
+\item{buffer_km}{Buffer distance in kilometers when \code{extent = "buffer"} (default: 5).}
 }
 \value{
 `get_watershed`: A list containing the `huc_id`, `feature_name`, `lon` and `lat` of the centroid, and `sf` `layer`.
@@ -44,6 +61,8 @@ discover_watershed_features(
 `autoplot.watershed_hex_overlay`: A `ggplot` object representing the spatial mesh.
 
 `discover_watershed_features`: A character vector of unique feature names found physically within the watershed bounds.
+
+An `sf` data frame of stream flowlines, or `NULL` if none found.
 }
 \description{
 Retrieves watershed boundary dataset (WBD) geometry for HUC12 identifiers,
@@ -51,4 +70,7 @@ applies OpenStreetMap feature clipping, generates hexagonal substrate grid overl
 and discovers named geographical features within subwatersheds.
 
 Projects a mathematical hexagonal substrate grid overlay across an extracted watershed boundary.
+
+Queries the USGS National Hydrography Dataset (NHD) via `nhdplusTools` for stream
+flowlines intersecting a watershed boundary or geographic area.
 }

@@ -26,9 +26,10 @@ This User Guide explains:
 
 ## 1. Interactive Map Exploration & Regional Search
 
-The `watershed` package provides two interactive Shiny applications:
+The `watershed` package provides three interactive Shiny applications:
 
-- **`watershedApp()`**: Complete interactive explorer combining Leaflet discovery, HUC selection, feature restriction, hexagon grid diameter sliders, and topology downloads.
+- **`watershedApp()`**: Complete interactive explorer combining Leaflet discovery, HUC selection, feature restriction, NHD stream flowlines, hexagon grid diameter sliders, dynamic legends, and topology downloads.
+- **`streamsApp()`**: Dedicated USGS StreamStats point delineation and NHD flowline explorer.
 - **`leafletApp()`**: Standalone Leaflet map explorer focused on point reverse-geocoding and rubberband polygon regional search.
 
 ### Discovering Subwatersheds
@@ -100,6 +101,7 @@ Clicking **Download Watershed Topology (.rds)** in `watershedApp()` exports a si
 topology_object (S3 class: habitat_hex_overlay / watershed_hex_overlay)
 ├── $layer            : sf / sfc polygon boundary (selected region / feature restriction)
 ├── $individual_hucs  : sf data frame of individual component subwatersheds
+├── $flowlines        : sf data frame of intersecting NHD stream flowlines (or NULL)
 ├── $hex_overlay      : sfc polygon geometry list of hexagonal grid cells (or NULL if disabled)
 ├── $hex_habitat_sf   : sf data frame of hex cells with habitat scores & types (or NULL if disabled)
 ├── $habitat_sf       : sf data frame of extracted OpenStreetMap habitat polygons
@@ -135,6 +137,50 @@ if (!is.null(topo$hex_habitat_sf)) {
   head(hex_mesh_sf)
 }
 
-# 5. Render static ggplot autoplot directly
+# 5. Extract vector stream flowlines (if enabled)
+if (!is.null(topo$flowlines)) {
+  streams_sf <- topo$flowlines
+  head(streams_sf)
+}
+
+# 6. Render static ggplot autoplot directly (includes streams, HUCs, and hex grid)
 autoplot(topo)
 ```
+
+---
+
+## 5. Hydrography, Stream Flowlines & Interactive Legends
+
+The `watershed` package provides seamless visual and analytical stream modeling:
+
+### 1. Continuous USGS Hydrography Map Tile Layer
+- `watershedApp()` and `streamsApp()` incorporate the official **USGS National Hydrography Cached WMS** layer (`add_usgs_hydro_layer()`).
+- Provides a transparent, high-contrast overlay of all streams, rivers, canals, and lakes across the US without obscuring the base map.
+- Toggle between base maps (*CartoDB Positron*, *OpenStreetMap*, *Satellite Imagery*) and overlays using the Leaflet layer control in the top-right corner.
+
+### 2. Interactive NHD Stream Flowlines & User-Defined Extents
+- When **Overlay NHD Stream Flowlines** is enabled in `watershedApp()`, `watershed` automatically extracts vector stream flowlines via `nhdplusTools::get_nhdplus()` for the active HUC boundaries.
+- **Stream Extent Modes:**
+  - **`Constrained to HUC(s)` (`extent = "huc"`, default):** Restricts the flowline network strictly to the selected HUC boundary polygon(s).
+  - **`Extended Bounding Box` (`extent = "bbox"`):** Fetches the broader regional river network across the full rectangular bounding box of the watershed region.
+  - **`Buffered HUC Region` (`extent = "buffer"`):** Expands the stream retrieval zone outward by a user-defined distance (`1` to `25 km`, default: `5 km`).
+- **Strahler Stream Order Filtering:** Use the **Min Stream Order** slider (1 to 6) to filter flowlines by branching detail:
+  - *Order 1–2:* Small headwater creeks and intermittent tributaries.
+  - *Order 3–4:* Medium-sized rivers and main stems.
+  - *Order 5–6+:* Major continental rivers (e.g. Mississippi, Wisconsin, Ohio).
+- Line widths are automatically scaled by stream order, and clicking any stream polyline displays its GNIS name, order, and length.
+
+### 3. Dynamic Map Legend
+- Check **Display Map Legend** to display a clean, color-coded legend in the bottom-right corner of the Leaflet map:
+  - **Selected HUC Boundary:** Purple outline (`#8E44AD`)
+  - **Stream Flowlines (NHD):** Solid blue line (`#0055ff`)
+  - **Habitat / Landmarks:** Forest green (`#27AE60`)
+  - **Hex Mesh Cells:** Slate gray (`#7F8C8D`)
+- The legend dynamically adapts whenever layer checkboxes are toggled in the sidebar.
+
+### 4. Standalone USGS StreamStats Explorer (`streamsApp()`)
+- Launch `streamsApp()` to interactively click any point on a river or stream:
+  - Automatically queries the USGS StreamStats REST API to delineate the upstream catchment basin.
+  - Highlights intersecting vector stream flowlines within the selected search radius.
+  - Gracefully catches HTTP 422 warnings when clicking outside state boundaries or away from mapped flowline grid cells.
+

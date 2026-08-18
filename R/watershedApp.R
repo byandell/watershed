@@ -18,6 +18,8 @@ watershedInput <- function(id) {
     shiny::checkboxInput(ns("show_habitat"), "Overlay Habitat Features & Landmarks", value = TRUE),
     shiny::uiOutput(ns("feature_selector")),
     shiny::HTML("<hr style='margin: 10px 0;'/>"),
+    streamsInput(ns("streams"), mode = "sidebar"),
+    shiny::HTML("<hr style='margin: 10px 0;'/>"),
     shiny::checkboxInput(ns("enable_hex"), "Include Hexagonal Grid Overlay", value = TRUE),
     hex_size_slider(ns("n_hexagons"), label = "Hexagons:", selected = 100),
     shiny::actionButton(ns("update"), "Generate Hex Topology", class = "btn-primary", style = "width: 100%; margin-top: 5px;"),
@@ -251,6 +253,15 @@ watershedServer <- function(id) {
       return(res)
     })
 
+    # Module Composition: Delegate stream flowlines, hydrography, and dynamic legend to streamsServer module
+    streams_mod <- streamsServer(
+      "streams",
+      map_proxy_id = ns("map-mapper"),
+      watershed_sf = base_huc,
+      show_hex_reactive = shiny::reactive(input$enable_hex),
+      show_habitat_reactive = shiny::reactive(input$show_habitat)
+    )
+
     # Reactive pipeline to process watershed boundaries and feature restrictions
     huc_info <- shiny::reactive({
       shiny::req(input$huc12_id)
@@ -295,10 +306,13 @@ watershedServer <- function(id) {
       })
     }) |> shiny::bindEvent(input$update, ignoreNULL = FALSE)
 
-    # Reactive to construct the hexagonal overlay mesh (optional)
+    # Reactive to construct the hexagonal overlay mesh and attach stream flowlines
     hex_obj <- shiny::reactive({
       huc <- huc_info()
       shiny::req(huc)
+
+      # Attach flowlines directly from streams module
+      huc$flowlines <- streams_mod$flowlines()
 
       if (!isTRUE(input$enable_hex)) {
         res <- huc
@@ -327,6 +341,8 @@ watershedServer <- function(id) {
       calc_diameter <- max(calc_diameter, 0.0005)
 
       base_mesh <- add_watershed_hex_overlay(huc, hex_diameter = calc_diameter)
+      base_mesh$flowlines <- streams_mod$flowlines()
+
       if (isTRUE(input$show_habitat)) {
         add_habitat_hex_overlay(base_mesh)
       } else {
@@ -363,10 +379,12 @@ watershedServer <- function(id) {
       )
 
       n_hex <- if (!is.null(obj$hex_overlay)) length(obj$hex_overlay) else 0
+      n_streams <- if (!is.null(obj$flowlines)) nrow(obj$flowlines) else 0
       hex_str <- if (n_hex > 0) paste0("<b>Generated Hex Grid:</b> ", n_hex, " hex cells created for HUC ") else "<b>Watershed Boundary Loaded for HUC </b>"
       feat_str <- if (!is.null(obj$feature_name) && obj$feature_name != "") paste0(" (Restricted to '", obj$feature_name, "')") else ""
       hab_str <- if (inherits(obj, "habitat_hex_overlay")) " + Habitat Overlays" else ""
-      status_msg(paste0("<div style='color:green;'>", hex_str, obj$huc_id, feat_str, hab_str, "</div>"))
+      stream_str <- if (n_streams > 0) paste0(" + ", n_streams, " Stream Flowlines") else ""
+      status_msg(paste0("<div style='color:green;'>", hex_str, obj$huc_id, feat_str, hab_str, stream_str, "</div>"))
     })
 
     # Render ggplot autoplot

@@ -4,11 +4,13 @@ S3method(ggplot2::autoplot,habitat_hex_overlay)
 S3method(ggplot2::autoplot,watershed_hex_overlay)
 export(add_draw_toolbar)
 export(add_habitat_hex_overlay)
+export(add_leaflet_flowlines)
 export(add_leaflet_habitat_overlay)
 export(add_leaflet_hex_overlay)
 export(add_streamstats_layer)
 export(add_usgs_hydro_layer)
 export(add_watershed_hex_overlay)
+export(add_watershed_legend)
 export(aggregate_hucs)
 export(build_base_map)
 export(create_isle_royale_hex_overlay)
@@ -20,6 +22,7 @@ export(get_isle_royale_cache_file)
 export(get_moose_landmarks)
 export(get_site_cache_file)
 export(get_watershed)
+export(get_watershed_flowlines)
 export(hex_size_choices)
 export(hex_size_slider)
 export(leafletApp)
@@ -56,12 +59,17 @@ importFrom(leaflet,
   renderLeaflet,
   setView
 )
-importFrom(nhdplusTools,get_huc)
+importFrom(nhdplusTools,
+  get_huc,
+  get_nhdplus
+)
 importFrom(sf,
   sf_use_s2,
   st_area,
   st_as_sf,
+  st_as_sfc,
   st_bbox,
+  st_buffer,
   st_centroid,
   st_coordinates,
   st_crs,

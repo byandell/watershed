@@ -193,12 +193,17 @@ autoplot.watershed_hex_overlay <- function(object, ...) {
     p <- p + ggplot2::geom_sf(data = object$hex_overlay, fill = NA, color = "#7F8C8D", linewidth = 0.5)
   }
   
-  # 2. Display individual component HUC boundaries if multi-HUC
+  # 2. Overlay vector stream flowlines if present
+  if (!is.null(object$flowlines) && inherits(object$flowlines, "sf") && nrow(object$flowlines) > 0) {
+    p <- p + ggplot2::geom_sf(data = object$flowlines, color = "#0055ff", linewidth = 0.6, alpha = 0.8)
+  }
+  
+  # 3. Display individual component HUC boundaries if multi-HUC
   if (!is.null(object$individual_hucs) && nrow(object$individual_hucs) > 1) {
     p <- p + ggplot2::geom_sf(data = object$individual_hucs, fill = NA, color = "purple", linetype = "dashed", linewidth = 0.4)
   }
   
-  # 3. Combined watershed boundary ON TOP
+  # 4. Combined watershed boundary ON TOP
   p <- p + ggplot2::geom_sf(data = object$layer, fill = NA, color = "blue", linewidth = 0.8)
   
   p +
@@ -313,3 +318,74 @@ discover_watershed_features <- function(huc_id, feature_types = c("natural", "wa
   
   return(clean_names)
 }
+
+#' Extract NHD Stream Flowlines for a Watershed
+#'
+#' Queries the USGS National Hydrography Dataset (NHD) via `nhdplusTools` for stream
+#' flowlines intersecting a watershed boundary or geographic area.
+#'
+#' @param watershed_obj A `watershed` S3 object or an `sf` polygon object.
+#' @param min_stream_order Minimum Strahler stream order to include (default: 1).
+#' @param extent Character string specifying extent mode: \code{"huc"} (default, strictly constrained
+#'   to HUC boundary), \code{"bbox"} (bounding box area of watershed), or \code{"buffer"} (buffered region around HUC).
+#' @param buffer_km Buffer distance in kilometers when \code{extent = "buffer"} (default: 5).
+#' @return An `sf` data frame of stream flowlines, or `NULL` if none found.
+#' @export
+#' @rdname watershed
+#'
+#' @importFrom nhdplusTools get_nhdplus
+#' @importFrom sf st_transform st_union st_as_sfc st_bbox st_buffer st_intersects sf_use_s2
+get_watershed_flowlines <- function(watershed_obj,
+                                    min_stream_order = 1,
+                                    extent = c("huc", "bbox", "buffer"),
+                                    buffer_km = 5) {
+  extent <- match.arg(extent)
+  aoi <- if (inherits(watershed_obj, "sf") || inherits(watershed_obj, "sfc")) {
+    watershed_obj
+  } else if (!is.null(watershed_obj$layer)) {
+    watershed_obj$layer
+  } else {
+    NULL
+  }
+  
+  if (is.null(aoi) || nrow(aoi) == 0) return(NULL)
+  
+  aoi_4326 <- sf::st_transform(aoi, 4326)
+  aoi_union <- suppressWarnings(sf::st_union(aoi_4326))
+  
+  # Ensure query AOI is passed as a single unified geometry to nhdplusTools
+  query_aoi <- if (extent == "bbox") {
+    sf::st_as_sfc(sf::st_bbox(aoi_4326))
+  } else if (extent == "buffer") {
+    buf_dist <- if (!is.null(buffer_km) && is.numeric(buffer_km)) buffer_km else 5
+    suppressWarnings(sf::st_transform(sf::st_buffer(sf::st_transform(aoi_union, 5070), buf_dist * 1000), 4326))
+  } else {
+    aoi_union
+  }
+  
+  flowlines <- tryCatch({
+    nhdplusTools::get_nhdplus(AOI = query_aoi, realization = "flowline")
+  }, error = function(e) {
+    warning("Failed to retrieve NHD stream flowlines: ", e$message)
+    NULL
+  })
+  
+  if (is.null(flowlines) || nrow(flowlines) == 0) return(NULL)
+  
+  flowlines <- sf::st_transform(flowlines, 4326)
+  
+  # When constrained to HUC, filter to geometries physically intersecting the HUC boundaries
+  if (extent == "huc") {
+    old_s2 <- suppressMessages(sf::sf_use_s2(FALSE))
+    inter <- suppressWarnings(lengths(sf::st_intersects(flowlines, aoi_union)) > 0)
+    suppressMessages(sf::sf_use_s2(old_s2))
+    flowlines <- flowlines[inter, ]
+  }
+  
+  if (is.numeric(min_stream_order) && min_stream_order > 1 && "streamorde" %in% names(flowlines)) {
+    flowlines <- flowlines[!is.na(flowlines$streamorde) & flowlines$streamorde >= min_stream_order, ]
+  }
+  
+  return(flowlines)
+}
+

@@ -19,8 +19,9 @@ The **`watershed`** R package was extracted from `ewing` into a standalone repos
 ## 1. Package Architecture & Components
 
 - **R Source Code (`R/`)**:
-  - [`R/watershedApp.R`](../R/watershedApp.R) & [`R/leafletApp.R`](../R/leafletApp.R) — Interactive Shiny application modules and wrappers.
-  - [`R/watershed.R`](../R/watershed.R) & [`R/leaflet.R`](../R/leaflet.R) — USGS HUC subwatershed retrieval, spatial clipping, and Leaflet overlays.
+  - [`R/watershedApp.R`](../R/watershedApp.R), [`R/streamsApp.R`](../R/streamsApp.R) & [`R/leafletApp.R`](../R/leafletApp.R) — Interactive Shiny application modules and wrappers.
+  - [`R/watershed.R`](../R/watershed.R) & [`R/leaflet.R`](../R/leaflet.R) — USGS HUC subwatershed retrieval, NHD stream flowline extraction, dynamic legends, spatial clipping, and Leaflet overlays.
+  - [`R/streams.R`](../R/streams.R) — USGS StreamStats point delineation, NHD vector flowlines, and USGS Hydrography WMS tile layers.
   - [`R/habitat.R`](../R/habitat.R) — OpenStreetMap habitat feature extraction, landmark geocoding, and substrate suitability scoring.
   - [`R/step_controls.R`](../R/step_controls.R) — Geometric scale slider builders (`10, 20, 50, 100, 200, 500, 1000`) and slider choice parsers.
   - [`R/get_site_cache_file.R`](../R/get_site_cache_file.R) — Multi-landscape spatial cache resolver for `"watershed"`.
@@ -87,3 +88,62 @@ The **`watershed`** R package was extracted from `ewing` into a standalone repos
   - Scaled initial queries based on drawn polygon extent ($km^2$) to avoid REST API timeouts over multi-state regions.
   - Automatically synced the sidebar slider (`shiny::updateSliderInput`) to match the safest base level determined for the region upon searching.
   - Reset sidebar selectize dropdown choices and selected values (`input$huc12_id`) in sync when clicking **Clear Region** or purging drawn shapes.
+
+## 6. Hydrography, Stream Flowlines & Interactive Legends
+
+### User Prompt & Feature Evolution
+
+> **Prompt:** "I want to use streamsApp.R module in watershedApp.R module to add overlay of flowlines and drainage basins. Critique using USGS National Hydrography Tile Service vs Open Street Map. Enable use of legend as in streamsApp. Come up with a plan to improve watershedApp."
+
+### Critique: USGS Hydrography Tile Service vs. OpenStreetMap
+
+- **USGS National Hydrography Dataset (NHD & WMS Tiles)**:
+  - *Authority & Continuity:* Federal gold standard for US waterways, maintaining topological continuity, downstream flow direction, and Strahler stream orders (1–10).
+  - *WBD Alignment:* Mathematically derived from the same elevation models as USGS HUC subwatersheds and StreamStats catchments.
+  - *Transparent Layering:* `USGSHydroCached` provides transparent map tiles that layer cleanly over any base map (Positron, Satellite, OSM).
+- **OpenStreetMap (OSM / `osmdata`)**:
+  - *Crowdsourced Attributes:* Excellent local detail in populated areas, but lacks hydrologic flow direction, connectivity verification, and stream order hierarchies in rural/remote zones.
+  - *Opaque Base Maps:* Standard OSM tiles are fully opaque; extracting vector streams on-the-fly via Overpass API queries introduces rate limits and high network latency.
+- **Adopted Strategy:** Use **USGS Hydrography WMS** for continuous base stream visualization, **`nhdplusTools` vector flowlines** for interactive/order-weighted rivers in selected HUCs, and **OSM (`osmdata`)** strictly for non-hydrological landmass boundaries (e.g. island perimeters).
+
+### Implementation Walkthrough & Shiny Module Composition
+
+To maintain clean separation of concerns and achieve **zero code duplication**, stream extraction and legend management are implemented as a composable Shiny module in [`R/streamsApp.R`](../R/streamsApp.R) consumed directly by [`R/watershedApp.R`](../R/watershedApp.R):
+
+1. **Modular UI Component (`streamsInput(id, mode = c("standalone", "sidebar"))`)**:
+   - In `mode = "sidebar"`, renders compact sidebar controls (`show_flowlines`, `min_stream_order`, `show_legend`, and `clear_streams`) for clean embedding inside parent module UI (`watershedInput`).
+   - In `mode = "standalone"`, renders full-page explorer controls including region selector dropdown (`rcode`), buffer radius slider, and dedicated map output (`stream_map`).
+
+2. **Modular Server Component (`streamsServer(id, map_proxy_id, watershed_sf, ...)`)**:
+   - Operates in embedded mode when `watershed_sf` and `map_proxy_id` are provided by `watershedServer`: observes the active HUC boundary, queries `get_watershed_flowlines()`, and directly updates the parent's Leaflet proxy and map legend.
+   - Operates in standalone mode when launched independently: manages map click events, queries StreamStats pour points, and renders catchments.
+   - Returns a reactive list of outputs (`$flowlines`, `$show_flowlines`, `$min_stream_order`, `$show_legend`, `$status`) to parent callers.
+
+3. **Leaflet Proxy & Base Map Capabilities ([`R/leaflet.R`](../R/leaflet.R))**:
+   - Upgraded `build_base_map()` with multi-provider base groups (*CartoDB Positron*, *OpenStreetMap*, *Satellite Imagery*) and the transparent USGS Hydrography WMS overlay layer.
+   - Added `add_leaflet_flowlines()` to render NHD flowlines weighted by stream order (`streamorde`) with clickable popups (stream names, orders, segment lengths).
+   - Added `add_watershed_legend()` to render dynamic, color-coded map legends for active layers.
+
+4. **NHD Stream Flowline Extraction & Autoplot ([`R/watershed.R`](../R/watershed.R))**:
+   - Added `get_watershed_flowlines(watershed_obj, min_stream_order = 1, extent = c("huc", "bbox", "buffer"), buffer_km = 5)` to fetch NHD flowlines within any HUC boundary, bounding box, or buffered zone.
+   - **Defensive Multi-Feature Union:** Unifies input geometries (`sf::st_union`) prior to calling `nhdplusTools::get_nhdplus()` to prevent scalar `if (st_geometry_type(AOI) == "POINT")` vector length $>1$ runtime errors.
+   - Updated `autoplot.watershed_hex_overlay()` to render vector stream networks underneath the hexagonal mesh in static `ggplot2` plots.
+
+### Empirical Verification Commands
+
+```{r, eval = FALSE}
+# 1. R Syntax & Roxygen Verification
+parse(file = "R/watershed.R")
+parse(file = "R/watershedApp.R")
+parse(file = "R/streamsApp.R")
+parse(file = "R/leaflet.R")
+roxygen2::roxygenise()
+
+# 2. Interactive Map & App Initialization Test
+library(leaflet)
+devtools::load_all(".")
+app1 <- watershedApp()
+app2 <- streamsApp()
+map <- leaflet() |> add_usgs_hydro_layer() |> add_watershed_legend()
+```
+

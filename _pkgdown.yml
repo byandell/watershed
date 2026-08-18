@@ -39,6 +39,7 @@ reference:
   - title: "GIS Watershed & Spatial Mesh Utilities"
     contents:
       - get_watershed
+      - get_watershed_flowlines
       - add_watershed_hex_overlay
       - add_streamstats_layer
       - add_usgs_hydro_layer
@@ -49,6 +50,8 @@ reference:
       - get_huc_from_point
       - get_hucs_from_polygon
       - add_leaflet_hex_overlay
+      - add_leaflet_flowlines
+      - add_watershed_legend
   - title: "Moose Habitat Features & Overlays"
     contents:
       - get_habitat_features

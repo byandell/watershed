@@ -8,6 +8,8 @@
 \alias{aggregate_hucs}
 \alias{get_hucs_from_polygon}
 \alias{add_leaflet_hex_overlay}
+\alias{add_leaflet_flowlines}
+\alias{add_watershed_legend}
 \title{Interactive Leaflet Geographic Utilities}
 \usage{
 build_base_map()
@@ -25,6 +27,22 @@ add_leaflet_hex_overlay(
   hex_obj,
   hex_color = "#7F8C8D",
   bound_color = "#8E44AD"
+)
+
+add_leaflet_flowlines(
+  map,
+  flowlines,
+  stream_color = "#0055ff",
+  group = "Stream Flowlines"
+)
+
+add_watershed_legend(
+  map,
+  show_hex = TRUE,
+  show_streams = TRUE,
+  show_habitat = TRUE,
+  show_legend = TRUE,
+  position = "bottomright"
 )
 }
 \arguments{
@@ -49,6 +67,22 @@ add_leaflet_hex_overlay(
 \item{hex_color}{Stroke color for hexagonal grid cells (default: "#C0392B").}
 
 \item{bound_color}{Stroke color for watershed boundary (default: "#2980B9").}
+
+\item{flowlines}{An `sf` data frame containing LINESTRING geometries of stream flowlines.}
+
+\item{stream_color}{Stroke color for flowlines (default: "#0055ff").}
+
+\item{group}{Group name for layer controls (default: "Stream Flowlines").}
+
+\item{show_hex}{Logical. Include hex grid in legend.}
+
+\item{show_streams}{Logical. Include stream flowlines in legend.}
+
+\item{show_habitat}{Logical. Include habitat/landmarks in legend.}
+
+\item{show_legend}{Logical. Whether to show or remove legend.}
+
+\item{position}{Position on map (default: "bottomright").}
 }
 \value{
 `build_base_map`: A `leaflet` HTML widget object.
@@ -62,6 +96,10 @@ A Leaflet map object with draw toolbar attached.
 `get_hucs_from_polygon`: An `sf` data frame of overlapping HUC subwatersheds (auto-scaled via area & code-annealed prefix matching).
 
 `add_leaflet_hex_overlay`: Updated `leaflet` map object.
+
+Updated `leaflet` map object.
+
+Updated `leaflet` map object.
 }
 \description{
 Helper utilities for building interactive Leaflet base maps with search capabilities,
