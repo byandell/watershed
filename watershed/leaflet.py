@@ -9,7 +9,7 @@ from branca.element import MacroElement
 from jinja2 import Template
 import geopandas as gpd
 import matplotlib.pyplot as plt
-from hexmap.watershed import HexmapTopology
+from watershed.watershed import HexmapTopology
 
 
 class DrawListener(MacroElement):

@@ -260,7 +260,7 @@ def get_watershed(
                 "polygon_geojson": 1,
                 "limit": 1
             }
-            nom_resp = requests.get(nom_url, params=nom_params, headers={"User-Agent": "hexmap-r-python-pkg"}, timeout=10)
+            nom_resp = requests.get(nom_url, params=nom_params, headers={"User-Agent": "watershed-r-python-pkg"}, timeout=10)
             if nom_resp.status_code == 200:
                 nom_data = nom_resp.json()
                 if "features" in nom_data and len(nom_data["features"]) > 0:

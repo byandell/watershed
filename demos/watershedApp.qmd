@@ -1,6 +1,6 @@
 ---
-title: "hexmapApp (Hexagonal Watershed Explorer)"
-description: "Interactively identify USGS HUC12 subwatershed boundaries using Leaflet, isolate geographic landmass features (e.g., Isle Royale), and overlay spatial hexagonal substrate networks."
+title: "watershedApp (Interactive Watershed Explorer)"
+description: "Interactively identify USGS HUC subwatershed boundaries using Leaflet, isolate geographic landmass features (e.g., Isle Royale), and overlay spatial hexagonal substrate networks."
 author: "Brian S. Yandell"
 engine: knitr
 toc: true
@@ -12,21 +12,21 @@ format:
 
 [← Back to Demos Gallery](index.qmd)
 
-The **`hexmapApp()`** application provides an interactive interface for discovering USGS subwatersheds, isolating specific geographic features (such as island landmasses), and projecting spatial hexagonal substrate networks for quantitative population ethology simulations.
+The **`watershedApp()`** application provides an interactive interface for discovering USGS subwatersheds, isolating specific geographic features (such as island landmasses), and projecting spatial hexagonal substrate networks for quantitative population ethology simulations.
 
 ## Interactive Application Usage
 
 You can launch the interactive application natively in R:
 
 ```r
-library(hexmap)
+library(watershed)
 
 # Launch interactive Shiny app
-hexmapApp()
+watershedApp()
 ```
 
 > [!NOTE]
-> **Live Deployment:** The interactive application requires dynamic spatial intersection libraries (`sf`) and live USGS / OpenStreetMap API access. It is deployed live on [Posit Connect (HexMap)](https://connect.doit.wisc.edu/HexMap).
+> **Live Deployment:** The interactive application requires dynamic spatial intersection libraries (`sf`) and live USGS / OpenStreetMap API access.
 
 ---
 
@@ -40,7 +40,7 @@ Below is an example showing how `get_watershed()` retrieves the USGS HUC12 subwa
 #| fig.width: 8
 #| fig.height: 6
 
-library(hexmap)
+library(watershed)
 library(ggplot2)
 
 # Check if osmdata is installed for feature boundary restriction
@@ -60,6 +60,6 @@ ggplot2::autoplot(hex_obj)
 
 ## Technical Features
 
-1. **Leaflet Spatial Discovery**: Click any location on North America or search landmark strings to reverse-geocode coordinates into USGS HUC12 subwatershed IDs (`get_huc_from_point`).
+1. **Leaflet Spatial Discovery**: Click any location on North America or search landmark strings to reverse-geocode coordinates into USGS HUC subwatershed IDs (`get_huc_from_point`).
 2. **Feature Isolation**: Clip large HUC boundaries covering open water to target landmasses (e.g. Isle Royale) using `osmdata::getbb()`.
 3. **Hexagonal Mesh Scaling**: Parameterize cell extent diameter to scale spatial resolution dynamically.

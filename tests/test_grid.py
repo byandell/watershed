@@ -1,12 +1,12 @@
 """
-Unit tests for hexmap.grid module.
+Unit tests for watershed.grid module.
 """
 
 import math
 import pytest
 import geopandas as gpd
 from shapely.geometry import box
-from hexmap.grid import make_hex_grid
+from watershed.grid import make_hex_grid
 
 
 def test_make_hex_grid_counts():
@@ -28,8 +28,8 @@ def test_make_hex_grid_explicit_diameter():
 
 
 def test_autoplot():
-    from hexmap.watershed import get_watershed
-    from hexmap.leaflet import autoplot
+    from watershed.watershed import get_watershed
+    from watershed.leaflet import autoplot
     import matplotlib.pyplot as plt
 
     topo = get_watershed("041800000101")

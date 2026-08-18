@@ -1,11 +1,11 @@
 """
-Unit tests for hexmap.watershed module.
+Unit tests for watershed.watershed module.
 """
 
 import pytest
 import geopandas as gpd
 from shapely.geometry import box
-from hexmap.watershed import (
+from watershed.watershed import (
     HexmapTopology,
     get_huc,
     get_hucs_from_polygon,

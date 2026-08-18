@@ -8,7 +8,7 @@
 ^Rplots\.pdf$
 ^AGENTS\.md$
 ^pyproject\.toml$
-^hexmap$
+^watershed$
 ^.*\.egg-info$
 ^\.venv$
 ^\.pytest_cache$

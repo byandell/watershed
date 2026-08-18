@@ -1,4 +1,4 @@
-url: https://byandell.github.io/hexmap/
+url: https://byandell.github.io/watershed/
 template:
   bootstrap: 5
   includes:
@@ -28,17 +28,20 @@ navbar:
       href: demos/index.html
     github:
       icon: fab fa-github fa-lg
-      href: https://github.com/byandell/hexmap
+      href: https://github.com/byandell/watershed
 
 reference:
   - title: "Interactive Shiny Applications"
     contents:
-      - hexmapApp
+      - watershedApp
       - leafletApp
+      - streamsApp
   - title: "GIS Watershed & Spatial Mesh Utilities"
     contents:
       - get_watershed
       - add_watershed_hex_overlay
+      - add_streamstats_layer
+      - add_usgs_hydro_layer
       - discover_watershed_features
   - title: "Leaflet Interactive Mapping Utilities"
     contents:

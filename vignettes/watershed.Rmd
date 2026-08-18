@@ -1,8 +1,8 @@
 ---
-title: "Creation and Setup of hexmap R Package"
+title: "Creation and Setup of watershed R Package"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Creation and Setup of hexmap R Package}
+  %\VignetteIndexEntry{Creation and Setup of watershed R Package}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -14,16 +14,16 @@ knitr::opts_chunk$set(
 )
 ```
 
-The **`hexmap`** R package was extracted from `ewing` into a standalone repository located at [`~/Documents/GitHub/hexmap`](../) and published to GitHub at [byandell/hexmap](https://github.com/byandell/hexmap).
+The **`watershed`** R package was extracted from `ewing` into a standalone repository located at [`~/Documents/GitHub/watershed`](../) and published to GitHub at [byandell/watershed](https://github.com/byandell/watershed).
 
 ## 1. Package Architecture & Components
 
 - **R Source Code (`R/`)**:
-  - [`R/hexmapApp.R`](../R/hexmapApp.R) & [`R/leafletApp.R`](../R/leafletApp.R) — Interactive Shiny application modules and wrappers.
+  - [`R/watershedApp.R`](../R/watershedApp.R) & [`R/leafletApp.R`](../R/leafletApp.R) — Interactive Shiny application modules and wrappers.
   - [`R/watershed.R`](../R/watershed.R) & [`R/leaflet.R`](../R/leaflet.R) — USGS HUC subwatershed retrieval, spatial clipping, and Leaflet overlays.
   - [`R/habitat.R`](../R/habitat.R) — OpenStreetMap habitat feature extraction, landmark geocoding, and substrate suitability scoring.
   - [`R/step_controls.R`](../R/step_controls.R) — Geometric scale slider builders (`10, 20, 50, 100, 200, 500, 1000`) and slider choice parsers.
-  - [`R/get_site_cache_file.R`](../R/get_site_cache_file.R) — Multi-landscape spatial cache resolver for `"hexmap"`.
+  - [`R/get_site_cache_file.R`](../R/get_site_cache_file.R) — Multi-landscape spatial cache resolver for `"watershed"`.
 
 - **Package Infrastructure & CI/CD**:
   - [`DESCRIPTION`](../DESCRIPTION), [`NAMESPACE`](../NAMESPACE), [`README.md`](../README.md), and [`AGENTS.md`](../AGENTS.md).
@@ -31,14 +31,14 @@ The **`hexmap`** R package was extracted from `ewing` into a standalone reposito
 
 - **Data Caches & Quarto Demos**:
   - Pre-cached spatial layers in [`inst/extdata/`](../inst/extdata/).
-  - Standalone launchers [`app.R`](../app.R) & [`inst/hexApp/app.R`](../inst/hexApp/app.R).
-  - Quarto gallery and tutorial vignette in [`demos/`](../demos/) (`demos/index.qmd`, `demos/hexmapApp.qmd`).
+  - Standalone launchers [`app.R`](../app.R) & [`inst/watershedApp/app.R`](../inst/watershedApp/app.R).
+  - Quarto gallery and tutorial vignette in [`demos/`](../demos/) (`demos/index.qmd`, `demos/watershedApp.qmd`).
 
 ## 2. Refinements & Quality Assurance
 
 - **R CMD Check Validation**: Corrected S3 method exports (`@exportS3Method ggplot2::autoplot`), suppressed spherical geometry (`s2`) messages and planar warnings, declared global variables, and verified **`0 errors | 0 warnings | 0 notes (Status: OK)`**.
 - **Quarto Gallery & Hotlink Fix**: Formatted card containers in [`demos/index.qmd`](../demos/index.qmd) using 4-colon outer fences (`:::: {.grid}`) and added Bootstrap `.stretched-link` styling so clicking anywhere on a demo card navigates to its page.
-- **GitHub Integration**: Initialized remote repository `byandell/hexmap` via `usethis::use_github()`, configured issue tracker links, and published documentation to [https://byandell.github.io/hexmap/](https://byandell.github.io/hexmap/).
+- **GitHub Integration**: Initialized remote repository `byandell/watershed`, configured issue tracker links, and published documentation to [https://byandell.github.io/watershed/](https://byandell.github.io/watershed/).
 
 ## 3. Granularity Controls & Grid Scaling
 
@@ -55,7 +55,7 @@ The **`hexmap`** R package was extracted from `ewing` into a standalone reposito
   - Rendered hex grid in subtle slate gray (`#7F8C8D`) and positioned it **behind** HUC boundaries in Leaflet maps and `ggplot2` autoplots.
 
 - **Consolidated Single-Object Download**:
-  - Consolidated sidebar download options in [`R/hexmapApp.R`](../R/hexmapApp.R) into a single **Download Hexmap Topology (.rds)** button (`download_hexmap`).
+  - Consolidated sidebar download options in [`R/watershedApp.R`](../R/watershedApp.R) into a single **Download Watershed Topology (.rds)** button (`download_watershed`).
   - Downloads a single unified S3 spatial topology object containing all layers (`layer` boundary `sf`, `individual_hucs` `sf`, `hex_overlay` `sfc`, `hex_habitat_sf` suitability `sf`, `habitat_sf` features `sf`, and `landmarks_sf` POI points).
 
 ## 4. Interactive Drawing & Geometry Safety Refinements
@@ -76,7 +76,7 @@ The **`hexmap`** R package was extracted from `ewing` into a standalone reposito
 ## 5. HUC Level Selection & In-Memory Spatial Aggregation
 
 - **Sidebar HUC Level Control (`2–12`)**:
-  - Configured sidebar slider in [`R/hexmapApp.R`](../R/hexmapApp.R) (`input$huc_level`, `min = 2, max = 12, value = 8, step = 2`) to select target HUC digit levels (`HUC02` through `HUC12`).
+  - Configured sidebar slider in [`R/watershedApp.R`](../R/watershedApp.R) (`input$huc_level`, `min = 2, max = 12, value = 8, step = 2`) to select target HUC digit levels (`HUC02` through `HUC12`).
   - Formatted HUC layer names and code identifiers with standard two-digit zero padding (`"huc02"`, `"huc04"`, `"huc06"`, `"huc08"`, `"huc10"`, `"huc12"`).
 
 - **0-API-Call In-Memory Spatial Union Aggregation**:

@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hexmap"
+name = "watershed"
 version = "0.3.1"
 description = "Interactive Hexagonal Watershed Mapping and Spatial Substrate Projection in Python"
 readme = "README.md"
@@ -33,8 +33,8 @@ test = [
 ]
 
 [project.scripts]
-hexmap-app = "hexmap.cli:main"
+watershed-app = "watershed.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["hexmap*"]
+include = ["watershed*"]

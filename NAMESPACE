@@ -6,6 +6,8 @@ export(add_draw_toolbar)
 export(add_habitat_hex_overlay)
 export(add_leaflet_habitat_overlay)
 export(add_leaflet_hex_overlay)
+export(add_streamstats_layer)
+export(add_usgs_hydro_layer)
 export(add_watershed_hex_overlay)
 export(aggregate_hucs)
 export(build_base_map)
@@ -20,85 +22,96 @@ export(get_site_cache_file)
 export(get_watershed)
 export(hex_size_choices)
 export(hex_size_slider)
-export(hexmapApp)
-export(hexmapInput)
-export(hexmapOutput)
-export(hexmapServer)
 export(leafletApp)
 export(leafletOutput)
 export(leafletServer)
 export(parse_hex_size)
-importFrom(ggplot2,aes)
-importFrom(ggplot2,autoplot)
-importFrom(ggplot2,geom_sf)
-importFrom(ggplot2,geom_sf_text)
-importFrom(ggplot2,ggplot)
-importFrom(ggplot2,ggtitle)
-importFrom(ggplot2,labs)
-importFrom(ggplot2,scale_fill_viridis_c)
-importFrom(ggplot2,theme_minimal)
-importFrom(leaflet,addCircleMarkers)
-importFrom(leaflet,addPolygons)
-importFrom(leaflet,addPopups)
-importFrom(leaflet,addTiles)
-importFrom(leaflet,clearShapes)
-importFrom(leaflet,fitBounds)
-importFrom(leaflet,leaflet)
-importFrom(leaflet,leafletProxy)
-importFrom(leaflet,renderLeaflet)
-importFrom(leaflet,setView)
+export(streamsApp)
+export(streamsInput)
+export(streamsServer)
+export(watershedApp)
+export(watershedInput)
+export(watershedOutput)
+export(watershedServer)
+importFrom(ggplot2,
+  aes,
+  autoplot,
+  geom_sf,
+  geom_sf_text,
+  ggplot,
+  ggtitle,
+  labs,
+  scale_fill_viridis_c,
+  theme_minimal
+)
+importFrom(leaflet,
+  addCircleMarkers,
+  addPolygons,
+  addPopups,
+  addTiles,
+  clearShapes,
+  fitBounds,
+  leaflet,
+  leafletProxy,
+  renderLeaflet,
+  setView
+)
 importFrom(nhdplusTools,get_huc)
-importFrom(sf,sf_use_s2)
-importFrom(sf,st_area)
-importFrom(sf,st_as_sf)
-importFrom(sf,st_bbox)
-importFrom(sf,st_centroid)
-importFrom(sf,st_coordinates)
-importFrom(sf,st_crs)
-importFrom(sf,st_geometry)
-importFrom(sf,st_intersection)
-importFrom(sf,st_intersects)
-importFrom(sf,st_make_grid)
-importFrom(sf,st_make_valid)
-importFrom(sf,st_point)
-importFrom(sf,st_polygon)
-importFrom(sf,st_sf)
-importFrom(sf,st_sfc)
-importFrom(sf,st_transform)
-importFrom(sf,st_union)
-importFrom(shiny,HTML)
-importFrom(shiny,NS)
-importFrom(shiny,actionButton)
-importFrom(shiny,bindEvent)
-importFrom(shiny,br)
-importFrom(shiny,checkboxInput)
-importFrom(shiny,downloadButton)
-importFrom(shiny,downloadHandler)
-importFrom(shiny,fluidPage)
-importFrom(shiny,h4)
-importFrom(shiny,h5)
-importFrom(shiny,is.reactive)
-importFrom(shiny,mainPanel)
-importFrom(shiny,moduleServer)
-importFrom(shiny,observeEvent)
-importFrom(shiny,p)
-importFrom(shiny,plotOutput)
-importFrom(shiny,reactive)
-importFrom(shiny,reactiveVal)
-importFrom(shiny,renderPlot)
-importFrom(shiny,renderUI)
-importFrom(shiny,req)
-importFrom(shiny,selectizeInput)
-importFrom(shiny,shinyApp)
-importFrom(shiny,sidebarLayout)
-importFrom(shiny,sidebarPanel)
-importFrom(shiny,sliderInput)
-importFrom(shiny,tabPanel)
-importFrom(shiny,tabsetPanel)
-importFrom(shiny,tagList)
-importFrom(shiny,textInput)
-importFrom(shiny,titlePanel)
-importFrom(shiny,uiOutput)
-importFrom(shiny,updateSelectizeInput)
-importFrom(shiny,withProgress)
+importFrom(sf,
+  sf_use_s2,
+  st_area,
+  st_as_sf,
+  st_bbox,
+  st_centroid,
+  st_coordinates,
+  st_crs,
+  st_geometry,
+  st_intersection,
+  st_intersects,
+  st_make_grid,
+  st_make_valid,
+  st_point,
+  st_polygon,
+  st_sf,
+  st_sfc,
+  st_transform,
+  st_union
+)
+importFrom(shiny,
+  HTML,
+  NS,
+  actionButton,
+  bindEvent,
+  br,
+  checkboxInput,
+  downloadButton,
+  downloadHandler,
+  fluidPage,
+  h4,
+  h5,
+  is.reactive,
+  mainPanel,
+  moduleServer,
+  observeEvent,
+  p,
+  plotOutput,
+  reactive,
+  reactiveVal,
+  renderPlot,
+  renderUI,
+  req,
+  selectizeInput,
+  shinyApp,
+  sidebarLayout,
+  sidebarPanel,
+  sliderInput,
+  tabPanel,
+  tabsetPanel,
+  tagList,
+  textInput,
+  titlePanel,
+  uiOutput,
+  updateSelectizeInput,
+  withProgress
+)
 importFrom(utils,read.csv)

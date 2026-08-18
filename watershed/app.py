@@ -1,5 +1,5 @@
 """
-Shiny for Python interactive hexagonal watershed application module (`hexmapApp`).
+Shiny for Python interactive hexagonal watershed application module (`watershedApp`).
 """
 
 import html
@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 import geopandas as gpd
 from shapely.geometry import box
 from shiny import App, ui, render, reactive
-from hexmap.watershed import get_watershed, get_huc, get_hucs_from_polygon
-from hexmap.grid import make_hex_grid
-from hexmap.habitat import get_habitat_features, score_habitat_grid
-from hexmap.leaflet import build_leaflet_map, autoplot, DrawListener, HucClickListener
+from watershed.watershed import get_watershed, get_huc, get_hucs_from_polygon
+from watershed.grid import make_hex_grid
+from watershed.habitat import get_habitat_features, score_habitat_grid
+from watershed.leaflet import build_leaflet_map, autoplot, DrawListener, HucClickListener
 
 app_ui = ui.page_sidebar(
     ui.sidebar(
@@ -174,7 +174,7 @@ app_ui = ui.page_sidebar(
             )
         )
     ),
-    title="hexmap: Interactive Hexagonal Watershed & Substrate Explorer",
+    title="watershed: Interactive Hexagonal Watershed & Substrate Explorer",
 )
 
 
@@ -429,7 +429,7 @@ def server(input, output, session):
         parsed = json.loads(json_str)
         return json.dumps(parsed, indent=2)[:1500] + "\n... [truncated]"
 
-    @render.download(filename=lambda: f"hexmap_topology_{input.huc_id() or 'custom'}.geojson")
+    @render.download(filename=lambda: f"watershed_topology_{input.huc_id() or 'custom'}.geojson")
     def download_topology():
         topo = topo_data()
         if topo is None:

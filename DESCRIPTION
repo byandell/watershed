@@ -1,4 +1,4 @@
-Package: hexmap
+Package: watershed
 Type: Package
 Title: Interactive Hexagonal Watershed Mapping and Spatial Projection
 Version: 0.3.1
@@ -22,6 +22,6 @@ Suggests:
     knitr,
     rmarkdown
 VignetteBuilder: knitr
-Config/roxygen2/version: 8.0.0
-URL: https://byandell.github.io/hexmap/, https://github.com/byandell/hexmap
-BugReports: https://github.com/byandell/hexmap/issues
+Config/roxygen2/version: 8.1.0
+URL: https://byandell.github.io/watershed/, https://github.com/byandell/watershed
+BugReports: https://github.com/byandell/watershed/issues

@@ -5,7 +5,7 @@ Topology object serialization and deserialization utilities.
 import json
 from pathlib import Path
 import geopandas as gpd
-from hexmap.watershed import HexmapTopology
+from watershed.watershed import HexmapTopology
 
 
 def save_topology(topo: HexmapTopology, filepath: str | Path) -> None:

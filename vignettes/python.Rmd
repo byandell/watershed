@@ -14,21 +14,21 @@ knitr::opts_chunk$set(
 )
 ```
 
-This vignette outlines the architecture, layout, API design, dependencies, implementation plan, and detailed options analysis for integrating a companion **Python package** version of **`hexmap`** into this repository, mirroring the dual R + Python packaging pattern established in [`geyser`](https://github.com/byandell/geyser).
+This vignette outlines the architecture, layout, API design, dependencies, implementation plan, and detailed options analysis for integrating a companion **Python package** version of **`watershed`** into this repository, mirroring the dual R + Python packaging pattern established in [`geyser`](https://github.com/byandell/geyser).
 
 ## Prompts
 
-- Develop a plan to include a python package version of hexmap in this repo. You may find it useful to look at the repo ../geyser, which has both R and Python packages. 
+- Develop a plan to include a python package version of watershed in this repo. You may find it useful to look at the repo ../geyser, which has both R and Python packages. 
 - I need some help with the open question in the plan. Please expand pros and cons
 ---
 
 ## 1. Dual R + Python Architecture & Coexistence
 
-The `hexmap` repository uses a dual-package layout where both R and Python source trees co-exist cleanly in a single GitHub repository:
+The `watershed` repository uses a dual-package layout where both R and Python source trees co-exist cleanly in a single GitHub repository:
 
 - **R Package Location**: Root level directory (`DESCRIPTION`, `NAMESPACE`, `R/`, `man/`, `vignettes/`).
-- **Python Package Location**: Root level directory (`pyproject.toml` and package subdirectory `hexmap/`).
-- **Build Hygiene**: `.Rbuildignore` is configured to exclude Python build files (`pyproject.toml`, `hexmap/`, `*.egg-info`, `.venv/`, `build/`, `dist/`) so `R CMD check` runs cleanly without inspecting Python artifacts.
+- **Python Package Location**: Root level directory (`pyproject.toml` and package subdirectory `watershed/`).
+- **Build Hygiene**: `.Rbuildignore` is configured to exclude Python build files (`pyproject.toml`, `watershed/`, `*.egg-info`, `.venv/`, `build/`, `dist/`) so `R CMD check` runs cleanly without inspecting Python artifacts.
 
 ---
 
@@ -39,64 +39,33 @@ The `hexmap` repository uses a dual-package layout where both R and Python sourc
 1. **`.Rbuildignore`**: Exclude Python artifacts:
    ```
    ^pyproject\.toml$
-   ^hexmap$
+   ^watershed$
    ^.*\.egg-info$
    ^\.venv$
    ^\.pytest_cache$
-   ^__pycache__$
-   ^poetry\.lock$
-   ^build$
-   ^dist$
-   ```
-
-2. **`.gitignore`**: Exclude Python virtual environments and build cache directories.
-
-3. **`pyproject.toml`**: Define standard PEP 517 / PEP 621 build configuration using `setuptools`:
-   - **Package Name**: `hexmap`
-   - **Version**: `0.2.2` (synced with R package version)
-   - **Python Requirement**: `>=3.9`
-   - **Dependencies**: `geopandas>=0.12.0`, `shapely>=2.0.0`, `pyproj>=3.0.0`, `requests>=2.28.0`, `numpy>=1.22.0`, `pandas>=1.5.0`, `shiny>=0.5.0`, `folium>=0.14.0`.
-   - **CLI Entrypoint**: `hexmap-app = hexmap.cli:main`
-
----
-
-### Python Package Source Structure (`hexmap/`)
-
-```
-hexmap/
-├── __init__.py          # Package exports & version
-├── watershed.py         # USGS WBD / NHDPlus queries, spatial clipping, & HexmapTopology dataclass
-├── grid.py              # Hexagonal grid generation (Area-based diameter solver: d = sqrt(A / (0.65 * N)))
-├── habitat.py           # OSM habitat feature extraction & hex suitability scoring
-├── leaflet.py           # Folium / ipyleaflet interactive mapping helpers & GeoJSON export
-├── app.py               # Shiny for Python (shiny.express) interactive explorer module
-├── cli.py               # Automated CLI app launcher (hexmap-app)
-└── io.py                # Topology serialization (GeoJSON / GeoPackage / pickle / dict)
-```
-
 #### Module Descriptions
 
-- **`hexmap/watershed.py`**:
+- **`watershed/watershed.py`**:
   - `get_huc(huc_id, type='huc08')`: Queries official USGS WBD REST services (`https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer`) using two-digit padded HUC type names (`"huc02"` through `"huc12"`) to retrieve subwatershed polygon geometries as a `geopandas.GeoDataFrame`.
   - `get_hucs_from_polygon(polygon_gdf, huc_level=8, max_hucs=6)`: Implements area-based initial query scaling and code-annealed string prefix matching (`HUC12` $\rightarrow$ `HUC10` $\rightarrow$ `HUC08` $\rightarrow$ `HUC06` $\rightarrow$ `HUC04` $\rightarrow$ `HUC02`) to auto-scale HUC granularity dynamically.
   - `get_watershed(huc_id, feature_name=None)`: Fetches USGS subwatershed boundaries and applies spatial feature clipping (e.g. restricting boundary to an island landmass).
   - `HexmapTopology`: Dataclass representation of the unified spatial topology object.
 
-- **`hexmap/grid.py`**:
+- **`watershed/grid.py`**:
   - `make_hex_grid(boundary_gdf, n_hexagons=100)`: Calculates bounding box area $A$, solves for cell diameter $d = \sqrt{A / (0.65 \times N)}$ for $N \in \{10, 20, 50, 100, 200, 500, 1000\}$, and generates a `geopandas.GeoDataFrame` of spatial hexagonal grid polygons (`sfc_POLYGON`).
 
-- **`hexmap/habitat.py`**:
+- **`watershed/habitat.py`**:
   - `get_habitat_features(boundary_gdf)`: Queries OpenStreetMap Overpass API for inland lakes, waterways, bogs, and forests.
   - `score_habitat_grid(hex_gdf, habitat_gdf)`: Performs spatial intersections to score hex cells based on ecological suitability weights.
 
-- **`hexmap/leaflet.py`**:
+- **`watershed/leaflet.py`**:
   - `build_leaflet_map(topology_obj, hex_color="#7F8C8D", bound_color="#2980B9")`: Generates interactive `folium` / `ipyleaflet` Leaflet maps rendering HUC boundaries, gray hex grid overlays (positioned behind boundaries), and habitat layers.
 
-- **`hexmap/app.py` & `hexmap/cli.py`**:
+- **`watershed/app.py` & `watershed/cli.py`**:
   - Shiny for Python application module providing interactive discovery, geometric hexagon scale sliders (`10, 20, 50, 100, 200, 500, 1000`), feature restrictions, and topology downloads.
-  - `cli.py`: Automated command line launcher (`hexmap-app`).
+  - `cli.py`: Automated command line launcher (`watershed-app`).
 
-- **`hexmap/io.py`**:
+- **`watershed/io.py`**:
   - `save_topology(topo, filepath)` / `load_topology(filepath)`: Serializes topology objects to GeoJSON, GeoPackage, or JSON files.
 
 ---

@@ -11,7 +11,7 @@
 #' @name get_site_cache_file
 #' @rdname get_site_cache_file
 get_site_cache_file <- function(filename, site = "isle_royale") {
-  pkg_dir <- system.file(file.path("extdata", site), package = "hexmap")
+  pkg_dir <- system.file(file.path("extdata", site), package = "watershed")
   if (pkg_dir != "") {
     fp <- if (filename == "") pkg_dir else file.path(pkg_dir, filename)
     if (file.exists(fp) || dir.exists(fp)) return(fp)

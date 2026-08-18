@@ -1,29 +1,29 @@
 # Developer & Architecture Guide (`DEVELOPER.md`)
 
-Welcome to the **`hexmap`** R package developer documentation. This guide details the internal package architecture, data pipeline, S3 object structures, HUC granularity algorithms, and development guidelines for maintainers and contributors.
+Welcome to the **`watershed`** R package developer documentation. This guide details the internal package architecture, data pipeline, S3 object structures, HUC granularity algorithms, and development guidelines for maintainers and contributors.
 
 ---
 
 ## 1. Package Architecture Overview
 
-The `hexmap` package is organized into modular R files handling interactive Leaflet mapping, USGS NHDPlus subwatershed queries, OpenStreetMap habitat feature extractions, and mathematical hexagonal grid projections.
+The `watershed` package is organized into modular R files handling interactive Leaflet mapping, USGS NHDPlus subwatershed queries, OpenStreetMap habitat feature extractions, and mathematical hexagonal grid projections.
 
 ```
-hexmap/
+watershed/
 ├── R/
 │   ├── leaflet.R           # Base Leaflet map initialization, NHDPlus queries, & overlay rendering
 │   ├── leafletApp.R        # Modular Leaflet Shiny UI/Server for map search & polygon drawing
 │   ├── watershed.R        # USGS HUC retrieval, feature clipping, & watershed_hex_overlay S3 class
 │   ├── habitat.R          # OpenStreetMap feature extraction, landmark geocoding, & substrate scoring
-│   ├── hexmapApp.R        # Main Shiny application wrapper with granularity controls & download
+│   ├── watershedApp.R      # Main Shiny application wrapper with granularity controls & download
 │   └── get_site_cache_file.R # Multi-landscape spatial data cache resolver
 ├── inst/
 │   ├── extdata/            # Pre-cached spatial layers (Isle Royale features, landmarks, HUC features)
-│   └── hexApp/app.R        # Standalone application launcher
+│   └── watershedApp/app.R  # Standalone application launcher
 ├── vignettes/
-│   ├── hexmap.Rmd          # Package setup, architecture, and change log vignette
+│   ├── watershed.Rmd       # Package setup, architecture, and change log vignette
 │   └── user_guide.Rmd      # User guide explaining HUC granularity and topology download objects
-└── demos/                  # Quarto tutorial gallery (`index.qmd`, `hexmapApp.qmd`)
+└── demos/                  # Quarto tutorial gallery (`index.qmd`, `watershedApp.qmd`)
 ```
 
 ---
@@ -50,9 +50,9 @@ hexmap/
 - `add_habitat_hex_overlay(hex_obj)`: Intersects habitat polygons with the hexagonal substrate grid and computes suitability scores per hex cell.
 - S3 Class: `habitat_hex_overlay` (inherits from `watershed_hex_overlay`).
 
-### E. Main Application & Unified Download (`R/hexmapApp.R`)
-- `hexmapInput(id)`, `hexmapOutput(id)`, `hexmapServer(id)`: Reorganized sidebar layout with HUC Level slider (2 to 12, step = 2).
-- Provides a single **Download Hexmap Topology (.rds)** button (`download_hexmap`) exporting the full unified S3 object.
+### E. Main Application & Unified Download (`R/watershedApp.R`)
+- `watershedInput(id)`, `watershedOutput(id)`, `watershedServer(id)`: Reorganized sidebar layout with HUC Level slider (2 to 12, step = 2).
+- Provides a single **Download Watershed Topology (.rds)** button (`download_watershed`) exporting the full unified S3 object.
 
 ---
 
@@ -87,7 +87,7 @@ To prevent network latency and avoid rendering thousands of tiny HUC12 subwaters
    - **Area ≤ 1,000 km² / Point Markers:** initial query starts at `"huc12"` or target `huc_level`.
 2. **0-API-Call In-Memory Spatial Union Aggregation (`aggregate_hucs`):** When moving the HUC Level sidebar slider from finer to broader levels (e.g. `12` $\rightarrow$ `10` $\rightarrow$ `8` $\rightarrow$ `6` $\rightarrow$ `4` $\rightarrow$ `2`), fine HUC geometries cached in memory (`raw_fetched_hucs`) are merged via `sf::st_union` by prefix matching with **0 network API calls**.
 3. **Automatic Slider & UI Synchronization:**
-   - **Slider Auto-Sync:** When a region search completes, `hexmapServer` automatically updates the sidebar slider (`shiny::updateSliderInput`) to match the safest base level determined for the region.
+   - **Slider Auto-Sync:** When a region search completes, `watershedServer` automatically updates the sidebar slider (`shiny::updateSliderInput`) to match the safest base level determined for the region.
    - **Clear Region Reset:** Clicking **Clear Region** or deleting drawn features resets Leaflet map shape layers and clears the sidebar multi-select dropdown (`input$huc12_id`) in sync.
 
 ---

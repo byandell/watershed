@@ -1,4 +1,4 @@
-library(hexmap)
+library(watershed)
 
-# Launch interactive Hexagonal Watershed Projection app
-hexmap::hexmapApp()
+# Launch interactive Watershed Projection app
+watershed::watershedApp()

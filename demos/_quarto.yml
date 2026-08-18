@@ -5,18 +5,18 @@ project:
 engine: knitr
 
 website:
-  title: "hexmap Demos"
+  title: "watershed Demos"
   navbar:
     left:
       - href: ../index.html
         text: Home
       - href: index.qmd
         text: Gallery
-      - href: hexmapApp.qmd
-        text: hexmapApp
+      - href: watershedApp.qmd
+        text: watershedApp
     right:
       - icon: github
-        href: https://github.com/byandell/hexmap
+        href: https://github.com/byandell/watershed
 
 format:
   html:

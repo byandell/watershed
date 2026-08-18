@@ -1,23 +1,23 @@
 library(leaflet)
 library(sf)
-library(hexmap)
+library(watershed)
 
-title <- "Hexagonal Watershed Map"
+title <- "Interactive Watershed Map"
 
 ui <- shiny::fluidPage(
     shiny::titlePanel(title),
     shiny::sidebarLayout(
         shiny::sidebarPanel(
-            hexmap::hexmapInput("hexmap")
+            watershed::watershedInput("watershed")
         ),
         shiny::mainPanel(
-            hexmap::hexmapOutput("hexmap")
+            watershed::watershedOutput("watershed")
         )
     )
 )
 
 server <- function(input, output, session) {
-    hexmap::hexmapServer("hexmap")
+    watershed::watershedServer("watershed")
 }
 
 shiny::shinyApp(ui = ui, server = server)

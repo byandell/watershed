@@ -1,4 +1,4 @@
-# hexmap — AI Guidelines & Development Rules
+# watershed — AI Guidelines & Development Rules
 
 ## AI Assistant Guidelines
 

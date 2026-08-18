@@ -1,8 +1,8 @@
 ---
-title: "User Guide: Interactive Hexagonal Mapping & Topology Data Structure"
+title: "User Guide: Interactive Watershed Mapping & Topology Data Structure"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{User Guide: Interactive Hexagonal Mapping & Topology Data Structure}
+  %\VignetteIndexEntry{User Guide: Interactive Watershed Mapping & Topology Data Structure}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -14,21 +14,21 @@ knitr::opts_chunk$set(
 )
 ```
 
-The **`hexmap`** R package provides interactive discovery of USGS Hydrologic Unit Code (HUC) subwatershed boundaries, dynamic feature isolation (such as island landmasses via OpenStreetMap), and spatial projection of hexagonal substrate grid networks.
+The **`watershed`** R package provides interactive discovery of USGS Hydrologic Unit Code (HUC) subwatershed boundaries, dynamic feature isolation (such as island landmasses via OpenStreetMap), and spatial projection of hexagonal substrate grid networks.
 
 This User Guide explains:
 1. Interactive map exploration and regional search (Polygon, Rectangle, and Pin Marker tools).
 2. HUC subwatershed granularity auto-scaling and controls.
 3. Hexagonal substrate mesh construction, geometric scale selection, and habitat suitability scoring.
-4. The structure and usage of the consolidated single-object **Hexmap Topology (.rds)** download.
+4. The structure and usage of the consolidated single-object **Watershed Topology (.rds)** download.
 
 ---
 
 ## 1. Interactive Map Exploration & Regional Search
 
-The `hexmap` package provides two interactive Shiny applications:
+The `watershed` package provides two interactive Shiny applications:
 
-- **`hexmapApp()`**: Complete interactive explorer combining Leaflet discovery, HUC selection, feature restriction, hexagon grid diameter sliders, and topology downloads.
+- **`watershedApp()`**: Complete interactive explorer combining Leaflet discovery, HUC selection, feature restriction, hexagon grid diameter sliders, and topology downloads.
 - **`leafletApp()`**: Standalone Leaflet map explorer focused on point reverse-geocoding and rubberband polygon regional search.
 
 ### Discovering Subwatersheds
@@ -58,9 +58,9 @@ USGS NHDPlus organizes watersheds into hierarchical Hydrologic Unit Codes (HUC):
 When drawing a regional polygon across a large geographic area:
 - Small drawn regions (e.g. a small county) or point markers return fine-grained **HUC12** subwatersheds.
 - Large drawn regions (spanning multiple counties or states) automatically scale starting queries to broader levels (**HUC06** / **HUC04**) based on region area to avoid fetching thousands of tiny HUC12 shapes.
-- `hexmap` automatically scales HUC granularity using area-based initial query scaling and **code-annealed prefix matching** (`HUC12` $\rightarrow$ `HUC10` $\rightarrow$ `HUC08` $\rightarrow$ `HUC06` $\rightarrow$ `HUC04` $\rightarrow$ `HUC02`).
+- `watershed` automatically scales HUC granularity using area-based initial query scaling and **code-annealed prefix matching** (`HUC12` $\rightarrow$ `HUC10` $\rightarrow$ `HUC08` $\rightarrow$ `HUC06` $\rightarrow$ `HUC04` $\rightarrow$ `HUC02`).
 
-### Adjusting Granularity in `hexmapApp()`
+### Adjusting Granularity in `watershedApp()`
 
 Use the **HUC Level** slider in the sidebar (default: `8`, range: `2` to `12`, step: `2`):
 - **Lower levels (2–6):** Selects broad regional sub-basins (`HUC02`, `HUC04`, or `HUC06`).
@@ -70,18 +70,18 @@ Use the **HUC Level** slider in the sidebar (default: `8`, range: `2` to `12`, s
 
 ## 3. Hexagonal Substrate Grid & Geometric Scale Selection
 
-Once watershed boundaries are selected, `hexmap` can optionally project a regular spatial hexagonal grid (`sfc_POLYGON`) across the boundary extent.
+Once watershed boundaries are selected, `watershed` can optionally project a regular spatial hexagonal grid (`sfc_POLYGON`) across the boundary extent.
 
 - **Optional Hex Overlay:** Unchecking **Include Hexagonal Grid Overlay** skips hex grid construction, returning pure watershed boundaries, subwatersheds, and habitat features with `hex_overlay = NULL`.
 - **Geometric Hexagon Scale (10 to 1,000):** Users adjust the **Approximate Number of Hexagons** slider across geometric steps:
   $$\text{Target Hexagons } N \in \{10, 20, 50, 100, 200, 500, 1000\}$$
   (Default: `100` hexagons).
-- **Area-Based Diameter Calculation:** `hexmap` computes the bounding box area $A$ of the active region and automatically solves for the cell diameter $d$:
+- **Area-Based Diameter Calculation:** `watershed` computes the bounding box area $A$ of the active region and automatically solves for the cell diameter $d$:
   $$d = \sqrt{\frac{A}{0.65 \times N}}$$
   This guarantees that choosing $N = 100$ hexagons will ALWAYS generate ~100 grid cells regardless of whether the target region is a small island or a multi-state watershed.
 - **Gray Color & Background Layering:** The hexagonal substrate grid is rendered in subtle slate gray (`#7F8C8D`) and positioned **behind** the HUC watershed boundaries in both Leaflet maps and `ggplot2` autoplots, keeping watershed boundaries bold and prominent.
 
-- **Habitat Suitability Overlay:** When **Overlay Habitat Features & Landmarks** is enabled, `hexmap` queries OpenStreetMap for ecological features and scores each hex cell:
+- **Habitat Suitability Overlay:** When **Overlay Habitat Features & Landmarks** is enabled, `watershed` queries OpenStreetMap for ecological features and scores each hex cell:
   - **Lakes & Ponds:** +2.0 weight
   - **Waterways & Rivers:** +1.5 weight
   - **Bogs & Wetlands:** +1.8 weight
@@ -90,9 +90,9 @@ Once watershed boundaries are selected, `hexmap` can optionally project a regula
 
 ---
 
-## 4. Consolidated Hexmap Topology Download Object
+## 4. Consolidated Watershed Topology Download Object
 
-Clicking **Download Hexmap Topology (.rds)** in `hexmapApp()` exports a single unified S3 object (`habitat_hex_overlay` or `watershed_hex_overlay`) containing all spatial layers and metadata.
+Clicking **Download Watershed Topology (.rds)** in `watershedApp()` exports a single unified S3 object (`habitat_hex_overlay` or `watershed_hex_overlay`) containing all spatial layers and metadata.
 
 ### Downloaded Object Structure
 
@@ -111,8 +111,8 @@ topology_object (S3 class: habitat_hex_overlay / watershed_hex_overlay)
 
 ### Inspecting Downloaded Files in R
 
-```r
-library(hexmap)
+```{r, eval = FALSE}
+library(watershed)
 library(sf)
 library(ggplot2)
 

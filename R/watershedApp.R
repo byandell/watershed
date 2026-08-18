@@ -1,13 +1,13 @@
-#' Interactive Hexagonal Watershed Mapping UI (Input)
+#' Interactive Watershed Mapping UI (Input)
 #'
-#' UI controls for the hexagonal watershed mapping module. Allows geographic feature
-#' search, HUC12 identification, feature boundary clipping, and hexagon scaling.
+#' UI controls for the watershed mapping module. Allows geographic feature
+#' search, HUC identification, feature boundary clipping, and hexagon scaling.
 #'
 #' @param id Module ID
 #' @export
 #' @importFrom shiny NS tagList h4 h5 p textInput uiOutput sliderInput actionButton br HTML selectizeInput downloadButton checkboxInput
-#' @rdname hexmapApp
-hexmapInput <- function(id) {
+#' @rdname watershedApp
+watershedInput <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
     shiny::h4("Hexagonal Watershed Controls"),
@@ -21,14 +21,14 @@ hexmapInput <- function(id) {
     shiny::checkboxInput(ns("enable_hex"), "Include Hexagonal Grid Overlay", value = TRUE),
     hex_size_slider(ns("n_hexagons"), label = "Hexagons:", selected = 100),
     shiny::actionButton(ns("update"), "Generate Hex Topology", class = "btn-primary", style = "width: 100%; margin-top: 5px;"),
-    shiny::downloadButton(ns("download_hexmap"), "Download Hexmap Topology (.rds)", class = "btn-secondary", style = "width: 100%; margin-top: 6px;"),
+    shiny::downloadButton(ns("download_watershed"), "Download Watershed Topology (.rds)", class = "btn-secondary", style = "width: 100%; margin-top: 6px;"),
     shiny::HTML("<hr style='margin: 15px 0;'/>"),
     shiny::h5("Selected Watersheds (HUCs)"),
     shiny::uiOutput(ns("huc_selector"))
   )
 }
 
-#' Interactive Hexagonal Watershed Mapping UI (Output)
+#' Interactive Watershed Mapping UI (Output)
 #'
 #' Main visual output panel presenting interactive Leaflet map renderings (via `leafletInput` module composition)
 #' and static `ggplot2` autoplots.
@@ -36,8 +36,8 @@ hexmapInput <- function(id) {
 #' @param id Module ID
 #' @export
 #' @importFrom shiny NS tagList tabsetPanel tabPanel plotOutput
-#' @rdname hexmapApp
-hexmapOutput <- function(id) {
+#' @rdname watershedApp
+watershedOutput <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
     shiny::tabsetPanel(
@@ -54,7 +54,7 @@ hexmapOutput <- function(id) {
   )
 }
 
-#' Interactive Hexagonal Watershed Mapping Server Logic
+#' Interactive Watershed Mapping Server Logic
 #'
 #' Server logic utilizing Shiny module composition by calling `leafletServer("map")` directly
 #' to handle interactive map discovery and HUC identification.
@@ -67,8 +67,8 @@ hexmapOutput <- function(id) {
 #' @importFrom sf st_bbox st_transform
 #' @importFrom utils read.csv
 #' @importFrom nhdplusTools get_huc
-#' @rdname hexmapApp
-hexmapServer <- function(id) {
+#' @rdname watershedApp
+watershedServer <- function(id) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -85,8 +85,6 @@ hexmapServer <- function(id) {
       }
     }, ignoreInit = TRUE)
 
-
-
     # Render dynamic HUC selector UI (multi-select with remove_button plugin)
     output$huc_selector <- shiny::renderUI({
       shiny::selectizeInput(
@@ -100,7 +98,7 @@ hexmapServer <- function(id) {
     })
 
     # Load dynamic landmark dictionary
-    csv_path <- system.file("extdata/watershed/huc_features.csv", package = "hexmap")
+    csv_path <- system.file("extdata/watershed/huc_features.csv", package = "watershed")
     if (csv_path == "") csv_path <- "inst/extdata/watershed/huc_features.csv"
 
     feature_dict <- shiny::reactive({
@@ -303,7 +301,6 @@ hexmapServer <- function(id) {
       shiny::req(huc)
 
       if (!isTRUE(input$enable_hex)) {
-        # Optional: Return watershed/habitat object without hexagonal mesh
         res <- huc
         res$hex_overlay <- NULL
         res$hex_diameter <- NULL
@@ -378,11 +375,11 @@ hexmapServer <- function(id) {
       ggplot2::autoplot(hex_obj())
     })
 
-    # Download Handler for Consolidated Hexmap Spatial Topology Object (.rds)
-    output$download_hexmap <- shiny::downloadHandler(
+    # Download Handler for Consolidated Watershed Spatial Topology Object (.rds)
+    output$download_watershed <- shiny::downloadHandler(
       filename = function() {
         feat_name <- input$feature_name
-        if (is.null(feat_name) || trimws(feat_name) == "") feat_name <- "hexmap"
+        if (is.null(feat_name) || trimws(feat_name) == "") feat_name <- "watershed"
         paste0(gsub("[^A-Za-z0-9]", "_", tolower(feat_name)), "_topology.rds")
       },
       content = function(file) {
@@ -405,31 +402,31 @@ hexmapServer <- function(id) {
   })
 }
 
-#' Run the Hexagonal Watershed Projection App
+#' Run the Interactive Watershed Projection App
 #'
 #' Launches an interactive Shiny application combining Leaflet spatial feature identification
-#' (via `leafletApp` module composition), USGS HUC12 subwatershed boundary lookup, feature area restriction,
+#' (via `leafletApp` module composition), USGS HUC subwatershed boundary lookup, feature area restriction,
 #' and hexagonal substrate grid overlays.
 #'
 #' @param title Application title string
 #' @export
 #' @importFrom shiny fluidPage titlePanel sidebarLayout sidebarPanel mainPanel shinyApp
-#' @rdname hexmapApp
-hexmapApp <- function(title = "Hexagonal Watershed Projection") {
+#' @rdname watershedApp
+watershedApp <- function(title = "Interactive Watershed Projection") {
   ui <- shiny::fluidPage(
     shiny::titlePanel(title),
     shiny::sidebarLayout(
       shiny::sidebarPanel(
-        hexmapInput("hexmap")
+        watershedInput("watershed")
       ),
       shiny::mainPanel(
-        hexmapOutput("hexmap")
+        watershedOutput("watershed")
       )
     )
   )
 
   server <- function(input, output, session) {
-    hexmapServer("hexmap")
+    watershedServer("watershed")
   }
 
   shiny::shinyApp(ui = ui, server = server)
