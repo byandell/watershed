@@ -32,7 +32,7 @@ get_watershed <- function(huc_id, feature_name = NULL, huc_layer = NULL) {
   if (is.null(huc_layer)) {
     n_digits <- nchar(huc_id[1])
     huc_type <- sprintf("huc%02d", n_digits)
-    huc_layer <- suppressWarnings(nhdplusTools::get_huc(id = huc_id, type = huc_type))
+    huc_layer <- suppressMessages(suppressWarnings(nhdplusTools::get_huc(id = huc_id, type = huc_type)))
   }
   
   if (is.null(huc_layer) || nrow(huc_layer) == 0) {
@@ -222,7 +222,7 @@ autoplot.watershed_hex_overlay <- function(object, ...) {
 #' @importFrom sf st_bbox st_transform st_crs st_intersects st_make_valid sf_use_s2
 discover_watershed_features <- function(huc_id, feature_types = c("natural", "waterway", "leisure")) {
   # Get HUC12 sf object to establish the tight bounding limit
-  huc_layer <- suppressWarnings(nhdplusTools::get_huc(id = huc_id, type = "huc12"))
+  huc_layer <- suppressMessages(suppressWarnings(nhdplusTools::get_huc(id = huc_id, type = "huc12")))
   
   if (is.null(huc_layer) || nrow(huc_layer) == 0) {
     stop("Invalid HUC12 ID or could not retrieve watershed data from USGS.")
@@ -363,13 +363,13 @@ get_watershed_flowlines <- function(watershed_obj,
   total_area_deg2 <- dx_all * dy_all
 
   # Adapt base minimum stream order based on the combined regional bounding box size
-  area_min_order <- if (total_area_deg2 > 3.5) {
+  area_min_order <- if (total_area_deg2 > 1.5) {
     5
-  } else if (total_area_deg2 > 1.0) {
+  } else if (total_area_deg2 > 0.5) {
     4
-  } else if (total_area_deg2 > 0.25) {
+  } else if (total_area_deg2 > 0.15) {
     3
-  } else if (total_area_deg2 > 0.05) {
+  } else if (total_area_deg2 > 0.03) {
     2
   } else {
     1
@@ -421,34 +421,67 @@ get_watershed_flowlines <- function(watershed_obj,
       }
     }
     
-    # Query USGS in a single unified batch for all missing HUCs (1 network call instead of N sequential calls)
+    # Query USGS for missing HUCs: use tight individual bboxes for macro areas (> 2 deg^2) to prevent giant server-side delays
     if (length(missing_hucs) > 0) {
       missing_mask <- aoi_4326[[huc_col]] %in% missing_hucs
       missing_sf <- aoi_4326[missing_mask, ]
       
-      missing_union <- suppressWarnings(sf::st_union(missing_sf))
-      q_missing_aoi <- if (extent == "bbox") {
-        sf::st_as_sfc(sf::st_bbox(missing_sf))
-      } else if (extent == "buffer") {
-        suppressWarnings(sf::st_transform(sf::st_buffer(sf::st_transform(missing_union, 5070), buf_dist * 1000), 4326))
-      } else {
-        missing_union
-      }
+      bb_missing <- sf::st_bbox(missing_sf)
+      dx_m <- max(as.numeric(bb_missing["xmax"] - bb_missing["xmin"]), 0.01)
+      dy_m <- max(as.numeric(bb_missing["ymax"] - bb_missing["ymin"]), 0.01)
+      area_missing_deg2 <- dx_m * dy_m
       
-      q_envelope <- sf::st_as_sfc(sf::st_bbox(q_missing_aoi))
+      old_s2 <- suppressMessages(sf::sf_use_s2(FALSE))
       
-      fl_batch <- tryCatch({
-        nhdplusTools::get_nhdplus(AOI = q_envelope, streamorder = query_order, realization = "flowline")
-      }, error = function(e) NULL)
-      
-      if (!is.null(fl_batch) && inherits(fl_batch, "sf") && nrow(fl_batch) > 0) {
-        fl_batch <- sf::st_transform(fl_batch, 4326)
-        keep_cols <- intersect(c("comid", "gnis_name", "lengthkm", "streamorde", attr(fl_batch, "sf_column")), names(fl_batch))
-        if (length(keep_cols) > 0) {
-          fl_batch <- fl_batch[, keep_cols, drop = FALSE]
+      if (nrow(missing_sf) == 1 || area_missing_deg2 <= 2.0) {
+        q_missing_aoi <- if (extent == "bbox" || extent == "huc") {
+          sf::st_as_sfc(sf::st_bbox(missing_sf))
+        } else if (extent == "buffer") {
+          missing_union <- suppressWarnings(sf::st_union(missing_sf))
+          suppressWarnings(sf::st_transform(sf::st_buffer(sf::st_transform(missing_union, 5070), buf_dist * 1000), 4326))
+        } else {
+          missing_sf
         }
         
-        old_s2 <- suppressMessages(sf::sf_use_s2(FALSE))
+        q_envelope <- sf::st_as_sfc(sf::st_bbox(q_missing_aoi))
+        
+        fl_batch <- tryCatch({
+          nhdplusTools::get_nhdplus(AOI = q_envelope, streamorder = query_order, realization = "flowline")
+        }, error = function(e) NULL)
+        
+        if (!is.null(fl_batch) && inherits(fl_batch, "sf") && nrow(fl_batch) > 0) {
+          fl_batch <- sf::st_transform(fl_batch, 4326)
+          keep_cols <- intersect(c("comid", "gnis_name", "lengthkm", "streamorde", attr(fl_batch, "sf_column")), names(fl_batch))
+          if (length(keep_cols) > 0) {
+            fl_batch <- fl_batch[, keep_cols, drop = FALSE]
+          }
+          
+          for (j in seq_len(nrow(missing_sf))) {
+            single_huc_sf <- missing_sf[j, ]
+            single_id <- as.character(single_huc_sf[[huc_col]])
+            h_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_%s", single_id, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"), ifelse(is.null(query_order), "1", as.character(query_order)))
+            
+            target_geom <- if (extent == "buffer") {
+              suppressWarnings(sf::st_transform(sf::st_buffer(sf::st_transform(single_huc_sf, 5070), buf_dist * 1000), 4326))
+            } else if (extent == "bbox") {
+              sf::st_as_sfc(sf::st_bbox(single_huc_sf))
+            } else {
+              single_huc_sf
+            }
+            
+            inter <- suppressWarnings(lengths(sf::st_intersects(fl_batch, target_geom)) > 0)
+            fl_single <- fl_batch[inter, ]
+            assign(h_key, fl_single, envir = .watershed_flowline_cache)
+            if (nrow(fl_single) > 0) cached_list[[single_id]] <- fl_single
+          }
+        } else {
+          for (j in seq_len(nrow(missing_sf))) {
+            single_id <- as.character(missing_sf[[huc_col]][j])
+            h_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_%s", single_id, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"), ifelse(is.null(query_order), "1", as.character(query_order)))
+            assign(h_key, NULL, envir = .watershed_flowline_cache)
+          }
+        }
+      } else {
         for (j in seq_len(nrow(missing_sf))) {
           single_huc_sf <- missing_sf[j, ]
           single_id <- as.character(single_huc_sf[[huc_col]])
@@ -462,19 +495,27 @@ get_watershed_flowlines <- function(watershed_obj,
             single_huc_sf
           }
           
-          inter <- suppressWarnings(lengths(sf::st_intersects(fl_batch, target_geom)) > 0)
-          fl_single <- fl_batch[inter, ]
-          assign(h_key, fl_single, envir = .watershed_flowline_cache)
-          if (nrow(fl_single) > 0) cached_list[[single_id]] <- fl_single
-        }
-        suppressMessages(sf::sf_use_s2(old_s2))
-      } else {
-        for (j in seq_len(nrow(missing_sf))) {
-          single_id <- as.character(missing_sf[[huc_col]][j])
-          h_key <- sprintf("huc_%s_ext_%s_buf_%s_ord_%s", single_id, extent, ifelse(extent == "buffer", as.character(buf_dist), "0"), ifelse(is.null(query_order), "1", as.character(query_order)))
-          assign(h_key, NULL, envir = .watershed_flowline_cache)
+          q_env_j <- sf::st_as_sfc(sf::st_bbox(target_geom))
+          fl_j <- tryCatch({
+            nhdplusTools::get_nhdplus(AOI = q_env_j, streamorder = query_order, realization = "flowline")
+          }, error = function(e) NULL)
+          
+          if (!is.null(fl_j) && inherits(fl_j, "sf") && nrow(fl_j) > 0) {
+            fl_j <- sf::st_transform(fl_j, 4326)
+            keep_cols <- intersect(c("comid", "gnis_name", "lengthkm", "streamorde", attr(fl_j, "sf_column")), names(fl_j))
+            if (length(keep_cols) > 0) {
+              fl_j <- fl_j[, keep_cols, drop = FALSE]
+            }
+            inter <- suppressWarnings(lengths(sf::st_intersects(fl_j, target_geom)) > 0)
+            fl_single <- fl_j[inter, ]
+            assign(h_key, fl_single, envir = .watershed_flowline_cache)
+            if (nrow(fl_single) > 0) cached_list[[single_id]] <- fl_single
+          } else {
+            assign(h_key, NULL, envir = .watershed_flowline_cache)
+          }
         }
       }
+      suppressMessages(sf::sf_use_s2(old_s2))
     }
     
     if (length(cached_list) == 0) return(NULL)

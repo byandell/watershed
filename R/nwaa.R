@@ -292,7 +292,7 @@ add_nwaa_huc_overlay <- function(map,
 
   # 2. Fetch Spatial Polygons via nhdplusTools
   huc_polys <- tryCatch(
-    suppressWarnings(nhdplusTools::get_huc(id = huc_clean, type = huc_type)),
+    suppressMessages(suppressWarnings(nhdplusTools::get_huc(id = huc_clean, type = huc_type))),
     error = function(e) NULL
   )
   if (is.null(huc_polys) || nrow(huc_polys) == 0) {

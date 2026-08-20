@@ -8,7 +8,7 @@
 \usage{
 leafletOutput(id)
 
-leafletServer(id, huc_level = 8, max_hucs = 6)
+leafletServer(id, huc_level = 8, max_hucs = 10)
 
 leafletApp()
 }
@@ -17,7 +17,7 @@ leafletApp()
 
 \item{huc_level}{Target USGS HUC digit level (2-12, default: 8, can be numeric or reactive).}
 
-\item{max_hucs}{Maximum target number of HUC regions when searching drawn polygon extent (default: 6, can be a numeric or reactive).}
+\item{max_hucs}{Maximum target number of HUC regions when searching drawn polygon extent (default: 10, can be a numeric or reactive).}
 }
 \value{
 A list of reactive objects: `huc` (reactiveVal holding discovered `sf` HUC polygon(s)),

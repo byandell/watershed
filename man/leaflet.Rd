@@ -5,6 +5,7 @@
 \alias{build_base_map}
 \alias{add_draw_toolbar}
 \alias{get_huc_from_point}
+\alias{get_huc_col}
 \alias{aggregate_hucs}
 \alias{get_hucs_from_polygon}
 \alias{add_leaflet_hex_overlay}
@@ -18,9 +19,11 @@ add_draw_toolbar(map)
 
 get_huc_from_point(lng, lat)
 
+get_huc_col(df)
+
 aggregate_hucs(hucs_sf, target_level = 8)
 
-get_hucs_from_polygon(polygon_sf, huc_level = 8, max_hucs = 6)
+get_hucs_from_polygon(polygon_sf, huc_level = 8, max_hucs = 10)
 
 add_leaflet_hex_overlay(
   map,
@@ -52,15 +55,19 @@ add_watershed_legend(
 
 \item{lat}{Numeric latitude coordinate}
 
+\item{df}{A data frame or `sf` object containing HUC columns.}
+
 \item{hucs_sf}{An `sf` data frame of fine HUC polygon geometries.}
 
-\item{target_level}{Target HUC digit level (2-12, numeric or character, default: 8).}
+\item{target_level}{Target HUC digit level (2-12, numeric or character, default: 8).
+
+Helper to resolve HUC ID column name across all HUC levels}
 
 \item{polygon_sf}{An `sf` or `sfc` polygon or point object representing a drawn rubberband region or marker.}
 
 \item{huc_level}{Target USGS HUC digit level (2, 4, 6, 8, 10, 12, or character e.g. "huc08"). Single-digit numbers are padded ("huc02", "huc04", "huc06", "huc08").}
 
-\item{max_hucs}{Maximum number of subwatersheds before scaling up to broader HUC levels (default: 6, targeting 5-7 regions).}
+\item{max_hucs}{Maximum number of subwatersheds before scaling up to broader HUC levels (default: 10, targeting 5-10 regions).}
 
 \item{hex_obj}{A `watershed_hex_overlay` S3 object (or a list containing `layer` and `hex_overlay` sf objects).}
 
@@ -90,6 +97,8 @@ add_watershed_legend(
 A Leaflet map object with draw toolbar attached.
 
 `get_huc_from_point`: An `sf` polygon representation of the covering HUC12.
+
+Character string of the identified HUC column name.
 
 `aggregate_hucs`: An `sf` data frame of aggregated parent HUC geometries.
 

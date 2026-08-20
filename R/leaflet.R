@@ -23,6 +23,7 @@ build_base_map <- function() {
     leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap") |>
     leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite Imagery") |>
     add_usgs_hydro_layer(group = "USGS Hydrography (Streams)") |>
+    leaflet::hideGroup("USGS Hydrography (Streams)") |>
     leaflet::addLayersControl(
       baseGroups = c("CartoDB Positron", "USGS Shaded Relief (DEM)", "USGS Topo", "OpenStreetMap", "Satellite Imagery"),
       overlayGroups = c("USGS Hydrography (Streams)", "Drawn Region", "huc_polygons", "Stream Flowlines", "StreamStats Basin", "Hex Overlay", "Habitat Overlay", "Landmarks"),
@@ -105,7 +106,7 @@ get_huc_from_point <- function(lng, lat) {
   res <- NULL
   tryCatch({
     # Automatically reverse-geocode the coordinate into the encompassing USGS HUC shape
-    res <- suppressWarnings(nhdplusTools::get_huc(AOI = pt, type = "huc12"))
+    res <- suppressMessages(suppressWarnings(nhdplusTools::get_huc(AOI = pt, type = "huc12")))
   }, error = function(e) {
     warning("Failed to locate USGS overlapping geometry at point coordinates: ", e$message)
   })
@@ -121,6 +122,23 @@ get_huc_from_point <- function(lng, lat) {
 #' @param hucs_sf An `sf` data frame of fine HUC polygon geometries.
 #' @param target_level Target HUC digit level (2-12, numeric or character, default: 8).
 #'
+#' Helper to resolve HUC ID column name across all HUC levels
+#'
+#' @param df A data frame or `sf` object containing HUC columns.
+#' @return Character string of the identified HUC column name.
+#' @export
+#' @rdname leaflet
+get_huc_col <- function(df) {
+  if (is.null(df)) return(NULL)
+  cols <- names(df)
+  for (c in c("huc16", "huc14", "huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
+    if (c %in% cols) {
+      return(c)
+    }
+  }
+  return(cols[1])
+}
+
 #' @return `aggregate_hucs`: An `sf` data frame of aggregated parent HUC geometries.
 #' @export
 #' @rdname leaflet
@@ -139,13 +157,7 @@ aggregate_hucs <- function(hucs_sf, target_level = 8) {
   }
   target_type <- sprintf("huc%02d", target_digits)
   
-  cols <- names(hucs_sf)
-  huc_col <- NULL
-  for (c in c("huc16", "huc14", "huc12", "huc10", "huc08", "huc8", "huc06", "huc6", "huc04", "huc4", "huc02", "huc2", "id")) {
-    if (c %in% cols) { huc_col <- c; break }
-  }
-  if (is.null(huc_col)) huc_col <- cols[1]
-  
+  huc_col <- get_huc_col(hucs_sf)
   ids <- as.character(hucs_sf[[huc_col]])
   curr_digits <- nchar(ids[1])
   
@@ -179,7 +191,7 @@ aggregate_hucs <- function(hucs_sf, target_level = 8) {
 
 #' @param polygon_sf An `sf` or `sfc` polygon or point object representing a drawn rubberband region or marker.
 #' @param huc_level Target USGS HUC digit level (2, 4, 6, 8, 10, 12, or character e.g. "huc08"). Single-digit numbers are padded ("huc02", "huc04", "huc06", "huc08").
-#' @param max_hucs Maximum number of subwatersheds before scaling up to broader HUC levels (default: 6, targeting 5-7 regions).
+#' @param max_hucs Maximum number of subwatersheds before scaling up to broader HUC levels (default: 10, targeting 5-10 regions).
 #'
 #' @return `get_hucs_from_polygon`: An `sf` data frame of overlapping HUC subwatersheds (auto-scaled via area & code-annealed prefix matching).
 #' @export
@@ -187,7 +199,7 @@ aggregate_hucs <- function(hucs_sf, target_level = 8) {
 #'
 #' @importFrom sf st_transform st_crs st_make_valid st_area st_bbox
 #' @importFrom nhdplusTools get_huc
-get_hucs_from_polygon <- function(polygon_sf, huc_level = 8, max_hucs = 6) {
+get_hucs_from_polygon <- function(polygon_sf, huc_level = 8, max_hucs = 10) {
   if (is.null(polygon_sf)) return(NULL)
   
   res <- NULL
@@ -213,8 +225,8 @@ get_hucs_from_polygon <- function(polygon_sf, huc_level = 8, max_hucs = 6) {
     is_point <- any(c("POINT", "MULTIPOINT") %in% geom_type)
 
     # Area-Based Starting HUC Query Scaling (applies to polygons/rectangles; points default to finest requested level)
-    start_type <- if (is_point) {
-      target_type
+    start_digits <- if (is_point) {
+      query_digits
     } else {
       area_km2 <- tryCatch({
         poly_proj <- suppressWarnings(sf::st_transform(poly_4326, 5070))
@@ -226,36 +238,54 @@ get_hucs_from_polygon <- function(polygon_sf, huc_level = 8, max_hucs = 6) {
         as.numeric(dx * dy)
       })
 
-      # Determine safe starting level from polygon area
-      area_level_digits <- if (area_km2 > 200000) {
+      # Calibrated Area Thresholds targeting 5-10 HUCs (e.g. 5-10 HUC8 subbasins for regions like Black Hills)
+      area_level_digits <- if (area_km2 > 150000) {
         4
-      } else if (area_km2 > 50000) {
+      } else if (area_km2 > 30000) {
         6
-      } else if (area_km2 > 10000) {
+      } else if (area_km2 > 2000) {
         8
-      } else if (area_km2 > 1000) {
+      } else if (area_km2 > 300) {
         10
       } else {
         12
       }
 
-      # Pick the broader level (smaller digit count) between user target and area-scaled recommendation to prevent REST timeouts
-      start_digits <- min(query_digits, area_level_digits)
-      sprintf("huc%02d", start_digits)
+      min(query_digits, area_level_digits)
     }
+
+    start_type <- sprintf("huc%02d", start_digits)
 
     # 1. Primary spatial AOI query at the scaled initial HUC level
     res_initial <- tryCatch(
-      suppressWarnings(nhdplusTools::get_huc(AOI = poly_4326, type = start_type)),
+      suppressMessages(suppressWarnings(nhdplusTools::get_huc(AOI = poly_4326, type = start_type))),
       error = function(e) NULL
     )
 
-    # Fallback to huc12 if requested fine level returns empty from USGS REST layer
+    # Fallback if empty
     if ((is.null(res_initial) || nrow(res_initial) == 0) && start_type != "huc12") {
-      res_initial <- suppressWarnings(nhdplusTools::get_huc(AOI = poly_4326, type = "huc12"))
+      res_initial <- suppressMessages(suppressWarnings(nhdplusTools::get_huc(AOI = poly_4326, type = "huc12")))
     }
 
-    res <- res_initial
+    # 2. Dynamic rollup guarantee: if returned count exceeds max_hucs, aggregate to parent HUC levels
+    curr_res <- res_initial
+    if (!is.null(curr_res) && nrow(curr_res) > max_hucs) {
+      h_col <- get_huc_col(curr_res)
+      if (!is.null(h_col)) {
+        digits <- nchar(as.character(curr_res[[h_col]][1]))
+        while (nrow(curr_res) > max_hucs && digits > 4) {
+          digits <- digits - 2
+          aggregated <- tryCatch(aggregate_hucs(curr_res, target_level = digits), error = function(e) NULL)
+          if (!is.null(aggregated) && nrow(aggregated) > 0) {
+            curr_res <- aggregated
+          } else {
+            break
+          }
+        }
+      }
+    }
+
+    res <- curr_res
   }, error = function(e) {
     warning("Failed to locate USGS HUC geometries overlapping drawn polygon: ", e$message)
   })

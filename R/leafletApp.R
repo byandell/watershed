@@ -27,7 +27,7 @@ leafletOutput <- function(id) {
 #'
 #' @param id Module ID
 #' @param huc_level Target USGS HUC digit level (2-12, default: 8, can be numeric or reactive).
-#' @param max_hucs Maximum target number of HUC regions when searching drawn polygon extent (default: 6, can be a numeric or reactive).
+#' @param max_hucs Maximum target number of HUC regions when searching drawn polygon extent (default: 10, can be a numeric or reactive).
 #' @return A list of reactive objects: `huc` (reactiveVal holding discovered `sf` HUC polygon(s)),
 #'   `status` (reactiveVal holding HTML status message), `click` (reactive holding map click details),
 #'   and `drawn_polygon` (reactiveVal holding user drawn rubberband polygon sf).
@@ -36,7 +36,7 @@ leafletOutput <- function(id) {
 #' @importFrom sf st_sfc st_polygon st_sf
 #' @importFrom shiny is.reactive
 #' @rdname leafletApp
-leafletServer <- function(id, huc_level = 8, max_hucs = 6) {
+leafletServer <- function(id, huc_level = 8, max_hucs = 10) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -56,11 +56,11 @@ leafletServer <- function(id, huc_level = 8, max_hucs = 6) {
     get_max_hucs <- function() {
       if (shiny::is.reactive(max_hucs)) {
         val <- max_hucs()
-        if (is.numeric(val) && length(val) > 0) val else 6
+        if (is.numeric(val) && length(val) > 0) val else 10
       } else if (is.numeric(max_hucs) && length(max_hucs) > 0) {
         max_hucs
       } else {
-        6
+        10
       }
     }
 
@@ -402,7 +402,7 @@ leafletServer <- function(id, huc_level = 8, max_hucs = 6) {
 
       status_msg("<div style='color:blue;'><b>Processing:</b> Querying USGS for watersheds in region...</div>")
       shiny::withProgress(message = "Searching Regional Watersheds...", value = 0.5, {
-        raw_hucs <- get_hucs_from_polygon(poly, huc_level = 12, max_hucs = 100)
+        raw_hucs <- get_hucs_from_polygon(poly, huc_level = get_huc_level(), max_hucs = get_max_hucs())
         raw_fetched_hucs(raw_hucs)
 
         if (!is.null(raw_hucs) && nrow(raw_hucs) > 0) {
@@ -410,14 +410,10 @@ leafletServer <- function(id, huc_level = 8, max_hucs = 6) {
           actual_digits <- nchar(as.character(raw_hucs[[raw_col]][1]))
           if (!is.na(actual_digits) && actual_digits >= 2 && actual_digits <= 12) {
             base_huc_level(actual_digits)
-            target_lvl <- get_huc_level()
-            if (is.numeric(target_lvl) && target_lvl > actual_digits) {
-              target_lvl <- actual_digits
-            }
           }
         }
 
-        hucs <- aggregate_hucs(raw_hucs, target_level = target_lvl)
+        hucs <- raw_hucs
 
         if (!is.null(hucs) && nrow(hucs) > 0) {
           huc_col <- get_huc_col(hucs)

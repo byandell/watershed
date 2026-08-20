@@ -257,7 +257,7 @@ watershedServer <- function(id) {
           {
             n_digits <- nchar(huc_vec[1])
             huc_type <- sprintf("huc%02d", n_digits)
-            suppressWarnings(nhdplusTools::get_huc(id = huc_vec, type = huc_type))
+            suppressMessages(suppressWarnings(nhdplusTools::get_huc(id = huc_vec, type = huc_type)))
           },
           error = function(e) NULL
         )

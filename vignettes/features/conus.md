@@ -70,20 +70,37 @@ StreamStats was designed solely for on-the-fly digital elevation raster catchmen
 | **Custom Pour-Point Delineation** | USGS StreamStats (`add_streamstats_layer()`) | **Slow (10–30s):** Computes raster flow accumulation grids on demand for an arbitrary stream click. | **Point-and-click reach analysis.** |
 | **Fast Watershed Delineation Alternative** | USGS Network Linked Data Index (NLDI) via `nhdplusTools::get_nldi_basin()` | **Sub-second:** Uses pre-indexed flowline COMIDs across CONUS to trace upstream basins instantly without raster processing. | **Instant continental catchment tracing.** |
 
-### 2.2 Why Multi-HUC6 Regions Take Time for Vector Flowlines
+### 2.2 Why Macro-Regions (e.g. 10 HUC8s / Multi-HUC6) Take Time for Vector Flowlines
 
-A single HUC6 basin spans approximately 25,000–50,000 $\text{km}^2$. Selecting **9 HUC6 basins** covers over **300,000 $\text{km}^2$** (spanning several full US states).
+A regional cluster like the **Black Hills (10 HUC8 subbasins, ~16,000 $\text{km}^2$)** or multi-HUC6 basins contains dense river tributary networks. Benchmarking live queries against the USGS NHDPlus REST API reveals how query latency scales with stream order:
 
-When clicking *"Constrained to HUC(s)"* on such a macro-scale:
-- The USGS NHDPlus server must query, serialize, and transmit **over 20,000 vector linestring segments**.
-- Benchmarking shows Order 5 stream reaches alone take **~40 seconds** over the public web API.
-- For broad multi-state exploration, the **USGS Hydrography WMS tile overlay** provides immediate visual inspection, while vector flowlines are optimized for local subwatershed modeling.
+| Strahler Stream Order | Query Latency | Returned Linestrings | Hydrographic Coverage |
+| :--- | :--- | :--- | :--- |
+| **Order 6** | **13.0 s** | 1,113 segments | Major trunk rivers (*Cheyenne & Belle Fourche Rivers*) |
+| **Order 5** | **19.9 s** | 2,122 segments | Principal tributary network (*Cheyenne, Belle Fourche, Beaver, Rapid Creek, Redwater River*) |
+| **Order 4** | **41.7 s** | 4,516 segments | Intermediate creek network |
+| **Order 3** | **62.1 s** | 9,052 segments | Fine tributary network |
+
+- **Tight Bounding Box Querying:** In `get_watershed_flowlines()`, multi-HUC regions exceeding $2.0 \text{ deg}^2$ are automatically queried using individual tight bounding boxes per HUC rather than a single giant union envelope that includes vast empty territory.
+- **Visual WMS Alternative:** For broad multi-state exploration, the **USGS Hydrography WMS tile overlay** (`add_usgs_hydro_layer()`) provides immediate (0.05s) visual inspection, while vector flowlines are optimized for local subwatershed modeling.
 
 ### 2.3 Layer Visibility Orchestration (WMS vs. Vector Streams)
 
 To prevent visual confusion when exploring constrained flowlines:
+- **Default WMS Suppression:** In `build_base_map()`, the global `"USGS Hydrography (Streams)"` layer is initialized unchecked/hidden by default, preventing streams from showing across the entire country on initial map load.
 - **Automatic WMS Suppression:** When any vector flowline extent mode is active (`"Constrained to HUC(s)"`, `"Extended Bounding Box"`, or `"Buffered HUC Region"`), the unconstrained background tile layer (`"USGS Hydrography (Streams)"`) is automatically hidden via `leaflet::hideGroup()`. This ensures that only the vector flowlines strictly belonging to the active basin are shown.
-- **Automatic WMS Restoration:** When the user switches stream extent back to `"None"`, the full-screen visual hydrography WMS layer is restored via `leaflet::showGroup()`.
+- **Automatic WMS Restoration:** When the user switches stream extent back to `"None"` (or clicks Clear Streams), the full-screen visual hydrography WMS layer is restored via `leaflet::showGroup()`.
+
+### 2.4 Automated Regional HUC Discovery & Dynamic Rollup Scaling
+
+When users draw arbitrary bounding boxes or search regional polygons (e.g. over the Black Hills, Driftless Area, or Adirondacks):
+- **Calibrated Area-Based Scale Selection:** `get_hucs_from_polygon()` computes the bounding box area in $\text{km}^2$ and selects a balanced starting hydrologic tier targeting **5–10 subbasins**:
+  - $> 150,000 \text{ km}^2 \implies$ **HUC4** *(Subregion)*
+  - $30,000 - 150,000 \text{ km}^2 \implies$ **HUC6** *(Basin)*
+  - $2,000 - 30,000 \text{ km}^2 \implies$ **HUC8** *(Subbasin — yields 5–10 HUC8 subbasins for regions like the Black Hills)*
+  - $300 - 2,000 \text{ km}^2 \implies$ **HUC10** *(Watershed)*
+  - $\le 300 \text{ km}^2 \implies$ **HUC12** *(Subwatershed)*
+- **Dynamic Rollup Guarantee (5–10 HUCs):** If an initial query yields more than `max_hucs` (default: 10), the algorithm automatically rolls up and aggregates child polygons to parent tiers via `aggregate_hucs()` until the number of units is $\le 10$. This prevents multi-dozen micro-catchment explosion while keeping regional subbasin structures intact.
 
 ---
 
@@ -102,11 +119,11 @@ flowchart TD
     AOI[Selected HUC Watershed Boundaries] --> CalcArea[Calculate Bounding Box Area in deg²]
     CalcArea --> AutoThreshold{Area Threshold on Load}
     
-    AutoThreshold -->|> 3.5 deg²| Ord5[Default Slider = 5]
-    AutoThreshold -->|1.0 - 3.5 deg²| Ord4[Default Slider = 4]
-    AutoThreshold -->|0.25 - 1.0 deg²| Ord3[Default Slider = 3]
-    AutoThreshold -->|0.05 - 0.25 deg²| Ord2[Default Slider = 2]
-    AutoThreshold -->|< 0.05 deg²| Ord1[Default Slider = 1]
+    AutoThreshold -->|> 1.5 deg²| Ord5[Default Slider = 5]
+    AutoThreshold -->|0.5 - 1.5 deg²| Ord4[Default Slider = 4]
+    AutoThreshold -->|0.15 - 0.5 deg²| Ord3[Default Slider = 3]
+    AutoThreshold -->|0.03 - 0.15 deg²| Ord2[Default Slider = 2]
+    AutoThreshold -->|< 0.03 deg²| Ord1[Default Slider = 1]
     
     Ord5 --> UserChoice{User Slider Selection}
     Ord4 --> UserChoice
@@ -125,10 +142,10 @@ In `R/watershed.R`, when `get_watershed_flowlines()` is called:
 
 1. The total geographic bounding box area $A_{\text{deg}^2} = \Delta x \times \Delta y$ of all selected HUCs is computed.
 2. A smart default order `area_min_order` is calculated for initial loading:
-   - $A > 3.5 \text{ deg}^2 \implies$ Default Order **5**
-   - $A > 1.0 \text{ deg}^2 \implies$ Default Order **4**
-   - $A > 0.25 \text{ deg}^2 \implies$ Default Order **3**
-   - $A > 0.05 \text{ deg}^2 \implies$ Default Order **2**
+   - $A > 1.5 \text{ deg}^2 \implies$ Default Order **5**
+   - $A > 0.5 \text{ deg}^2 \implies$ Default Order **4**
+   - $A > 0.15 \text{ deg}^2 \implies$ Default Order **3**
+   - $A > 0.03 \text{ deg}^2 \implies$ Default Order **2**
    - Otherwise $\implies$ Default Order **1**
 3. The effective query order directly honors the user's manual selection:
    $$\text{effective\_min\_order} = \begin{cases} \text{as.integer}(\text{min\_stream\_order}), & \text{if specified by user} \\ \text{area\_min\_order}, & \text{if NULL / default} \end{cases}$$
@@ -138,15 +155,21 @@ In `R/watershed.R`, when `get_watershed_flowlines()` is called:
 
 In `R/streamsApp.R`, `streamsServer()` sets an intelligent initial default for the slider when a new watershed region is loaded:
 
-- When loading a macro basin (e.g., HUC6 with $A > 1.0 \text{ deg}^2$), the slider initializes to order **4** or **5** to prevent initial browser lag.
-- The user can then freely slide down to **2** or **1** to load and explore finer tributary networks.
-- A progress bar (`shiny::withProgress`) informs the user while live NHD flowlines are retrieved from the federal server.
+- When loading a macro basin (e.g., $A > 1.5 \text{ deg}^2$ like the Black Hills), the slider initializes to order **5** to complete initial rendering in under 20 seconds.
+- The user can then freely slide down to **4**, **3**, or **2** to load finer tributary networks.
+- An instant progress bar (`shiny::withProgress`) informs the user while live NHD flowlines are retrieved from the federal server.
 
 ### 3.3 Compound Key In-Memory Caching
 
 To prevent redundant network requests when toggling between layers or adjusting visualization options, flowlines are cached under compound keys:
 $$\text{Key} = \texttt{"huc\_<ID>\_ext\_<ext>\_buf\_<buf>\_ord\_<ord>"}$$
 When multiple HUCs are selected, the package checks which HUCs are already cached in memory and issues a single unified batch query only for the missing HUCs.
+
+### 3.4 Spherical Geometry (S2) & Planar Operations Hygiene
+
+When intersecting flowlines with HUC polygon boundaries, `sf` uses GEOS planar engine under `sf::sf_use_s2(FALSE)` to achieve sub-second geometric processing across thousands of linestring vertices:
+- **Planar Assumption Warning:** Because geographic coordinates (EPSG:4326 longitude/latitude) are evaluated on a 2D plane during bounding-box intersection, `sf` emits informational messages (`"although coordinates are longitude/latitude, st_intersects assumes that they are planar"`).
+- **Hygiene Rule:** All planar intersection calls (`sf::st_intersects()`, `sf::st_intersection()`) are wrapped in `suppressWarnings()` and `suppressMessages(sf::sf_use_s2(FALSE))`, guaranteeing rapid, clean execution without console clutter.
 
 ---
 

@@ -162,13 +162,13 @@ streamsServer <- function(id,
             dy <- max(as.numeric(bb["ymax"] - bb["ymin"]), 0.01)
             total_area_deg2 <- dx * dy
             
-            target_ord <- if (total_area_deg2 > 3.5) {
+            target_ord <- if (total_area_deg2 > 1.5) {
               5
-            } else if (total_area_deg2 > 1.0) {
+            } else if (total_area_deg2 > 0.5) {
               4
-            } else if (total_area_deg2 > 0.25) {
+            } else if (total_area_deg2 > 0.15) {
               3
-            } else if (total_area_deg2 > 0.05) {
+            } else if (total_area_deg2 > 0.03) {
               2
             } else {
               1
@@ -209,6 +209,7 @@ streamsServer <- function(id,
         leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap") |>
         leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite Imagery") |>
         add_usgs_hydro_layer(group = "USGS Hydrography (Streams)") |>
+        leaflet::hideGroup("USGS Hydrography (Streams)") |>
         leaflet::addLayersControl(
           baseGroups = c("CartoDB Positron", "USGS Shaded Relief (DEM)", "USGS Topo", "OpenStreetMap", "Satellite Imagery"),
           overlayGroups = c("USGS Hydrography (Streams)", "StreamStats Basin", "Stream Flowlines"),
@@ -216,10 +217,6 @@ streamsServer <- function(id,
         ) |>
         leaflet::setView(lng = default_lng, lat = default_lat, zoom = default_zoom)
     })
-
-    # Debounce slider inputs to prevent network thrashing during slider dragging
-    throttled_buffer_km <- shiny::reactive(input$stream_buffer_km) |> shiny::debounce(400)
-    throttled_min_order <- shiny::reactive(input$min_stream_order) |> shiny::debounce(200)
 
     # --- Mode 1: Embedded Watershed Synchronization (when watershed_sf is provided) ---
     # Stage 1: Spatial Fetch Reactive
@@ -233,14 +230,20 @@ streamsServer <- function(id,
         return(NULL)
       }
 
-      buf_km <- if (!is.null(throttled_buffer_km())) throttled_buffer_km() else 5
-      min_ord <- if (!is.null(throttled_min_order())) throttled_min_order() else 4
-      shiny::withProgress(message = "Fetching NHD stream flowlines from USGS...", value = 0.5, {
-        tryCatch(
-          get_watershed_flowlines(w_sf, min_stream_order = min_ord, extent = ext, buffer_km = buf_km),
-          error = function(e) NULL
-        )
-      })
+      buf_km <- if (!is.null(input$stream_buffer_km)) input$stream_buffer_km else 5
+      min_ord <- if (!is.null(input$min_stream_order)) input$min_stream_order else 4
+
+      shiny::withProgress(
+        message = "Fetching USGS NHD Stream Flowlines...",
+        detail = "Connecting to USGS REST services...",
+        value = 0.3,
+        {
+          tryCatch(
+            get_watershed_flowlines(w_sf, min_stream_order = min_ord, extent = ext, buffer_km = buf_km),
+            error = function(e) NULL
+          )
+        }
+      )
     })
 
     # Stage 2: In-Memory Stream Order Filter Reactive
@@ -249,7 +252,7 @@ streamsServer <- function(id,
       raw_fl <- raw_flowlines_sf()
       if (is.null(raw_fl) || nrow(raw_fl) == 0) return(NULL)
 
-      min_ord <- if (!is.null(throttled_min_order())) throttled_min_order() else 4
+      min_ord <- if (!is.null(input$min_stream_order)) input$min_stream_order else 4
       if (is.numeric(min_ord) && min_ord > 1 && "streamorde" %in% names(raw_fl)) {
         raw_fl[!is.na(raw_fl$streamorde) & raw_fl$streamorde >= min_ord, ]
       } else {
