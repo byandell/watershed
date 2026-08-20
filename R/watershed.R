@@ -376,7 +376,7 @@ get_watershed_flowlines <- function(watershed_obj,
   }
 
   effective_min_order <- if (is.numeric(min_stream_order)) {
-    max(as.integer(min_stream_order), area_min_order)
+    as.integer(min_stream_order)
   } else {
     area_min_order
   }

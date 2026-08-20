@@ -36,6 +36,16 @@ reference:
       - watershedApp
       - leafletApp
       - streamsApp
+      - nwaaApp
+  - title: "USGS NWAA Water Availability Assessment"
+    contents:
+      - get_nwaa_data
+      - get_nwaa_models
+      - get_nwaa_variables
+      - add_nwaa_flowlines_layer
+      - add_nwaa_huc_overlay
+      - nwaaInput
+      - nwaaServer
   - title: "GIS Watershed & Spatial Mesh Utilities"
     contents:
       - get_watershed

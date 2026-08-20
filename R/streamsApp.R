@@ -148,29 +148,31 @@ streamsServer <- function(id,
       }, ignoreInit = TRUE)
     }
 
-    # Auto-adjust min_stream_order slider based on the total combined bounding box area of selected HUCs
+    # Auto-adjust min_stream_order slider default when a new HUC watershed region is selected
+    last_huc_key <- shiny::reactiveVal("")
     if (!is.null(watershed_sf) && shiny::is.reactive(watershed_sf)) {
       shiny::observeEvent(watershed_sf(), {
         w_sf <- watershed_sf()
         if (!is.null(w_sf) && inherits(w_sf, "sf") && nrow(w_sf) > 0) {
           bb <- sf::st_bbox(sf::st_transform(w_sf, 4326))
-          dx <- max(as.numeric(bb["xmax"] - bb["xmin"]), 0.01)
-          dy <- max(as.numeric(bb["ymax"] - bb["ymin"]), 0.01)
-          total_area_deg2 <- dx * dy
-          
-          target_ord <- if (total_area_deg2 > 3.5) {
-            5
-          } else if (total_area_deg2 > 1.0) {
-            4
-          } else if (total_area_deg2 > 0.25) {
-            3
-          } else if (total_area_deg2 > 0.05) {
-            2
-          } else {
-            1
-          }
-          
-          if (!is.null(input$min_stream_order) && input$min_stream_order < target_ord) {
+          current_key <- paste(round(as.numeric(bb), 3), collapse = "_")
+          if (current_key != last_huc_key()) {
+            last_huc_key(current_key)
+            dx <- max(as.numeric(bb["xmax"] - bb["xmin"]), 0.01)
+            dy <- max(as.numeric(bb["ymax"] - bb["ymin"]), 0.01)
+            total_area_deg2 <- dx * dy
+            
+            target_ord <- if (total_area_deg2 > 3.5) {
+              5
+            } else if (total_area_deg2 > 1.0) {
+              4
+            } else if (total_area_deg2 > 0.25) {
+              3
+            } else if (total_area_deg2 > 0.05) {
+              2
+            } else {
+              1
+            }
             shiny::updateSliderInput(session, "min_stream_order", value = target_ord)
           }
         }
@@ -233,10 +235,12 @@ streamsServer <- function(id,
 
       buf_km <- if (!is.null(throttled_buffer_km())) throttled_buffer_km() else 5
       min_ord <- if (!is.null(throttled_min_order())) throttled_min_order() else 4
-      tryCatch(
-        get_watershed_flowlines(w_sf, min_stream_order = min_ord, extent = ext, buffer_km = buf_km),
-        error = function(e) NULL
-      )
+      shiny::withProgress(message = "Fetching NHD stream flowlines from USGS...", value = 0.5, {
+        tryCatch(
+          get_watershed_flowlines(w_sf, min_stream_order = min_ord, extent = ext, buffer_km = buf_km),
+          error = function(e) NULL
+        )
+      })
     })
 
     # Stage 2: In-Memory Stream Order Filter Reactive
@@ -267,7 +271,12 @@ streamsServer <- function(id,
             leaflet::clearGroup("Stream Flowlines")
 
           if (has_streams) {
-            proxy <- proxy |> add_leaflet_flowlines(fl)
+            proxy <- proxy |>
+              leaflet::hideGroup("USGS Hydrography (Streams)") |>
+              add_leaflet_flowlines(fl)
+          } else {
+            proxy <- proxy |>
+              leaflet::showGroup("USGS Hydrography (Streams)")
           }
 
           # Update legend
@@ -367,7 +376,8 @@ streamsServer <- function(id,
     shiny::observeEvent(input$clear_streams, {
       get_proxy() |>
         leaflet::clearGroup("StreamStats Basin") |>
-        leaflet::clearGroup("Stream Flowlines")
+        leaflet::clearGroup("Stream Flowlines") |>
+        leaflet::showGroup("USGS Hydrography (Streams)")
 
       flowlines_sf(NULL)
       shiny::updateRadioButtons(session, "stream_extent", selected = "none")

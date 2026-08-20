@@ -20,6 +20,8 @@ watershedInput <- function(id) {
     shiny::HTML("<hr style='margin: 10px 0;'/>"),
     streamsInput(ns("streams"), mode = "sidebar"),
     shiny::HTML("<hr style='margin: 10px 0;'/>"),
+    nwaaInput(ns("nwaa"), mode = "sidebar"),
+    shiny::HTML("<hr style='margin: 10px 0;'/>"),
     shiny::checkboxInput(ns("enable_hex"), "Include Hexagonal Grid Overlay", value = TRUE),
     hex_size_slider(ns("n_hexagons"), label = "Hexagons:", selected = 100),
     shiny::actionButton(ns("update"), "Generate Hex Topology", class = "btn-primary", style = "width: 100%; margin-top: 5px;"),
@@ -273,6 +275,35 @@ watershedServer <- function(id) {
       show_hex_reactive = shiny::reactive(input$enable_hex),
       show_habitat_reactive = shiny::reactive(input$show_habitat)
     )
+
+    # Module Composition: Delegate USGS NWAA water availability layer to nwaaServer module
+    nwaa_mod <- nwaaServer(
+      "nwaa",
+      map_proxy_id = "map-mapper",
+      hucs = shiny::reactive(input$huc12_id),
+      parent_session = session
+    )
+
+    # Sync NWAA assessment overlay onto map-mapper proxy
+    shiny::observe({
+      proxy <- leaflet::leafletProxy(ns("map-mapper"))
+      if (isTRUE(nwaa_mod$enabled())) {
+        h_vec <- input$huc12_id
+        if (!is.null(h_vec) && length(h_vec) > 0 && any(nzchar(h_vec))) {
+          proxy |>
+            leaflet::clearGroup("NWAA Water Availability (HUC12)") |>
+            add_nwaa_huc_overlay(
+              huc = h_vec,
+              variable = nwaa_mod$variable(),
+              year = nwaa_mod$year(),
+              month = nwaa_mod$month(),
+              group = "NWAA Water Availability (HUC12)"
+            )
+        }
+      } else {
+        proxy |> leaflet::clearGroup("NWAA Water Availability (HUC12)")
+      }
+    })
 
     # Reactive pipeline to process watershed boundaries and feature restrictions
     huc_info <- shiny::reactive({
